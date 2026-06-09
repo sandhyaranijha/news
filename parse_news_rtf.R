@@ -214,6 +214,117 @@ NETWORK_HOURS <- list(
 )
 
 # ---------------------------------------------------------------------------
+# TRIGGER CLASSIFICATION
+# Searched only in the first 200 words (story lede) — the news peg is always
+# near the top of a broadcast story. Priority order determines the primary
+# trigger when multiple fire; earlier entries win ties.
+# ---------------------------------------------------------------------------
+
+TRIGGER_LIST <- list(
+
+  # 1. Supreme Court decisions — most specific, check first
+  supreme_court_ruling = c(
+    "the court ruled", "the court decided", "the justices ruled",
+    "supreme court ruled", "supreme court decided", "supreme court struck",
+    "supreme court upheld", "supreme court blocked", "supreme court heard",
+    "supreme court taking up", "supreme court takes up", "supreme court will hear",
+    "supreme court is taking", "supreme court weighs", "supreme court considers",
+    "justices will hear", "high court ruled", "high court decided",
+    "supreme court arguments", "oral arguments", "the justices", "the high court",
+    "dobbs", "whole woman's health", "fda v.", "alliance for hippocratic",
+    "june medical", "planned parenthood v.", "moyle v.", "idaho v."
+  ),
+
+  # 2. Federal / executive action
+  federal_executive = c(
+    "executive order", "president signed", "white house announced",
+    "biden signed", "trump signed", "administration announced",
+    "department of justice", "federal judge ruled", "federal court ruled",
+    "appeals court ruled", "circuit court ruled", "appeals court",
+    "congress passed", "senate passed", "house passed",
+    "federal law", "nationwide ban", "federal funding", "title x",
+    "fda announced", "fda approved", "fda ruled", "fda said",
+    "attorney general", "justice department"
+  ),
+
+  # 3. State legislation or court decisions
+  state_legislation = c(
+    "governor signed", "legislature passed", "state lawmakers passed",
+    "took effect", "went into effect", "state law", "state ban",
+    "state supreme court", "state court ruled", "state attorney general",
+    "state legislature", "passed a law", "new law in",
+    "the law", "the new law", "the ban", "ban takes effect",
+    "ban went into", "now illegal in", "now banned in",
+    "republican-led", "democratic-led", "lawmakers in",
+    "trigger law", "trigger laws", "trigger ban"
+  ),
+
+  # 4. Elections and campaigns
+  election_campaign = c(
+    "election day", "on the ballot", "ballot measure", "ballot initiative",
+    "voters approved", "voters rejected", "voters decided",
+    "campaign promise", "running on", "running for", "midterm",
+    "primary election", "general election", "swing state",
+    "congressional race", "senate race", "gubernatorial"
+  ),
+
+  # 5. Protests, marches, mobilization
+  protest_mobilization = c(
+    "marched", "march for life", "women's march", "protesters gathered",
+    "demonstrators", "rally", "rallied", "took to the streets",
+    "protest outside", "clinic escort", "counter-protest"
+  ),
+
+  # 6. Named patient / medical case (human-impact peg)
+  patient_medical_case = c(
+    "was denied", "denied care", "couldn't get care", "forced to travel",
+    "had to leave the state", "left the state for", "died after",
+    "died because", "nearly died", "bleeding", "ectopic",
+    "miscarriage", "complications", "her story", "her case",
+    "a woman in", "a patient in", "a mother in",
+    "she was", "she had", "she couldn't", "she needed",
+    "could not get", "unable to get care", "sought an abortion",
+    "seeking an abortion", "needed an abortion", "wanted an abortion",
+    "rape survivor", "rape victim", "10-year-old", "10 year old"
+  ),
+
+  # 7. Political controversy / scandal (e.g. Herschel Walker)
+  political_controversy = c(
+    "accused of", "allegations", "allegedly paid", "paid for an abortion",
+    "paid for her abortion", "paid for a woman", "paid for his",
+    "hypocrisy", "scandal", "controversy", "under fire",
+    "facing criticism", "called out", "strongly denies", "is denying"
+  ),
+
+  # 8. Anniversary / retrospective
+  anniversary_retrospective = c(
+    "anniversary", "years ago today", "one year after", "two years after",
+    "three years after", "since roe", "since dobbs", "since the ruling",
+    "looking back", "five years", "50 years", "50th anniversary"
+  ),
+
+  # 9. Poll / survey / research findings
+  poll_research = c(
+    "new poll", "new survey", "according to a poll", "according to a survey",
+    "a new study", "new research", "according to new data",
+    "polling shows", "survey found", "study found", "report found",
+    "according to the guttmacher", "cdc data", "new numbers"
+  )
+)
+
+# Assign a single primary trigger to a story based on its lede.
+# Returns the name of the first trigger category that fires, or "other".
+classify_trigger <- function(lede_lower) {
+  for (trigger_name in names(TRIGGER_LIST)) {
+    variants <- TRIGGER_LIST[[trigger_name]]
+    if (any(sapply(variants, function(v) str_detect(lede_lower, fixed(tolower(v)))))) {
+      return(trigger_name)
+    }
+  }
+  return("other")
+}
+
+# ---------------------------------------------------------------------------
 # FUNCTIONS
 # ---------------------------------------------------------------------------
 
@@ -293,7 +404,33 @@ parse_story <- function(raw_block, file_network) {
     network <- str_extract(toupper(meta_clean), "\\b(NBC|CBS|ABC|FOX|PBS)\\b")
   }
 
-  # --- Phrase counts ---
+  # --- Abortion segment lede: 200 words starting where abortion is first mentioned ---
+  # These are whole broadcast transcripts; the abortion segment can appear anywhere.
+  # Find the first abortion-related word, then take 200 words from that point.
+  ABORTION_ANCHORS <- c("abortion", "roe", "dobbs", "mifepristone",
+                         "reproductive rights", "pro-life", "pro-choice")
+  body_words  <- str_split(body_text, "\\s+")[[1]]
+  body_lower_words <- tolower(body_words)
+  seg_start <- NA_integer_
+  for (anchor in ABORTION_ANCHORS) {
+    hits <- which(str_detect(body_lower_words, fixed(anchor)))
+    if (length(hits) > 0) {
+      seg_start <- max(1, hits[1] - 20)  # 20 words of run-up for context
+      break
+    }
+  }
+  if (!is.na(seg_start)) {
+    story_lede <- paste(body_words[seg_start:min(length(body_words), seg_start + 199)],
+                        collapse = " ")
+  } else {
+    story_lede <- paste(head(body_words, 200), collapse = " ")
+  }
+  lede_lower <- tolower(story_lede)
+
+  # --- Trigger classification (from abortion segment lede only) ---
+  story_trigger <- classify_trigger(lede_lower)
+
+  # --- Phrase counts (full story text) ---
   body_lower <- tolower(body_text)
   phrase_counts <- sapply(PHRASE_LIST, function(variants) {
     sum(sapply(variants, function(v) str_count(body_lower, fixed(tolower(v)))))
@@ -311,12 +448,14 @@ parse_story <- function(raw_block, file_network) {
 
   as_tibble(c(
     list(
-      network    = network,
-      show       = show_clean,
-      story_date = date_parsed,
-      headline   = headline,
-      story_text = body_text,
-      word_count = str_count(body_text, "\\S+")
+      network       = network,
+      show          = show_clean,
+      story_date    = date_parsed,
+      headline      = headline,
+      story_trigger = story_trigger,
+      story_lede    = story_lede,
+      story_text    = body_text,
+      word_count    = str_count(body_text, "\\S+")
     ),
     as.list(phrase_counts)
   ))
@@ -426,3 +565,14 @@ phrase_totals <- df %>%
 
 message("\n=== Top phrases across all stories ===")
 print(phrase_totals, n = 20)
+
+message("\n=== Story triggers (all networks) ===")
+df %>%
+  count(story_trigger, sort = TRUE) %>%
+  print()
+
+message("\n=== Story triggers by network ===")
+df %>%
+  count(network, story_trigger) %>%
+  tidyr::pivot_wider(names_from = story_trigger, values_from = n, values_fill = 0) %>%
+  print()
