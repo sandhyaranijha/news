@@ -127,7 +127,16 @@ PHRASE_LIST <- list(
   # --- Story effect framing: patient impact vs. policy debate ---
   patient_impact         = c("forced to travel", "couldn't get care",
                               "denied care", "turned away", "couldn't afford",
-                              "had to leave the state", "left the state for"),
+                              "had to leave the state", "left the state for",
+                              "cross state lines", "across state lines",
+                              "forcing patients", "forcing women",
+                              "forcing many women", "look elsewhere for care",
+                              "travel to another state", "unable to access",
+                              "unable to get an abortion", "leaving the country",
+                              "can't get an abortion", "cannot get an abortion",
+                              "denied an abortion", "denied the procedure",
+                              "couldn't get an abortion", "sought care in",
+                              "had to go to another", "drove to another"),
   state_action           = c("state law", "state ban", "state legislature",
                               "state lawmakers", "state passed"),
   federal_action         = c("federal law", "federal ban", "congress",
@@ -285,7 +294,11 @@ TRIGGER_LIST <- list(
     "she was", "she had", "she couldn't", "she needed",
     "could not get", "unable to get care", "sought an abortion",
     "seeking an abortion", "needed an abortion", "wanted an abortion",
-    "rape survivor", "rape victim", "10-year-old", "10 year old"
+    "rape survivor", "rape victim", "10-year-old", "10 year old",
+    "cross state lines", "across state lines", "forcing patients",
+    "forcing women", "look elsewhere for care", "travel to another state",
+    "denied an abortion", "denied the procedure", "couldn't get an abortion",
+    "sought care in", "had to go to another"
   ),
 
   # 7. Political controversy / scandal (e.g. Herschel Walker)
