@@ -392,17 +392,84 @@ parse_story <- function(raw_block, file_network) {
   # Show name: bold text before b0
   show_name <- headline  # fallback
 
-  # Source line: e.g. "NBC News: Nightly News"
-  source_line <- str_extract(meta_clean, "NBC News:[^\\n]+|CBS News:[^\\n]+|ABC News:[^\\n]+|FOX News:[^\\n]+|PBS NewsHour[^\\n]*")
+  # Source line: e.g. "NBC News: Nightly News" or "The New York Times"
+  source_line <- str_extract(meta_clean,
+    paste0("NBC News:[^\\n]+|CBS News:[^\\n]+|ABC News:[^\\n]+|FOX News:[^\\n]+|",
+           "PBS NewsHour[^\\n]*|MSNBC:[^\\n]+|",
+           "The New York Times[^\\n]*|The Guardian[^\\n]*|",
+           "The Wall Street Journal[^\\n]*|Washington Post[^\\n]*"))
   if (is.na(source_line)) {
-    source_line <- str_extract(meta_clean, "(?:NBC|CBS|ABC|Fox|PBS)[^\\.\\n]{3,50}")
+    source_line <- str_extract(meta_clean, "(?:NBC|CBS|ABC|Fox|PBS|MSNBC)[^\\.\\n]{3,50}")
   }
 
   # Network: derive from file_network or source line
   network <- file_network
   if (is.na(network) || network == "") {
-    network <- str_extract(toupper(meta_clean), "\\b(NBC|CBS|ABC|FOX|PBS)\\b")
+    network <- str_extract(toupper(meta_clean), "\\b(NBC|CBS|ABC|FOX|PBS|MSNBC)\\b")
   }
+
+  # --- Factiva subject/region tag (first token before show name) ---
+  # e.g. "News; Domestic", "News; International", "News"
+  factiva_region <- str_extract(meta_clean, "News;?\\s*(?:Domestic|International)?")
+  factiva_region <- str_squish(factiva_region %||% "")
+
+  # --- Publication (for newspapers) and show (for TV) ---
+  # TV: clean up network prefix and source code suffix
+  # Newspapers: publication name is the source line itself
+  media_type <- if_else(
+    str_detect(toupper(source_line %||% ""),
+               "NBC|CBS|ABC|FOX|PBS|MSNBC"),
+    "tv", "print"
+  )
+
+  show_clean <- source_line %||% ""
+  # Remove network prefixes
+  show_clean <- str_replace(show_clean,
+    "^(NBC|CBS|ABC|Fox|PBS|MSNBC) News(Hour)?(\\s+Channel)?:\\s*", "")
+  show_clean <- str_replace(show_clean, "^MSNBC:\\s*", "")
+  # Remove trailing Factiva 3-6 char source codes e.g. "NTLN English"
+  show_clean <- str_remove(show_clean, "\\s+[A-Z]{3,6}(\\s.*)?$")
+  show_clean <- str_squish(show_clean)
+  if (nchar(show_clean) > 60) show_clean <- NA_character_
+
+  # Publication = cleaned source for print; show name for TV
+  publication <- if (media_type == "print") {
+    str_extract(source_line %||% "",
+      "New York Times|The Guardian|Wall Street Journal|Washington Post|[A-Z][^,\\n]{3,40}")
+  } else {
+    NA_character_
+  }
+
+  # --- Section (Opinion, News, Features, etc.) ---
+  # Factiva sometimes includes section info; also detect from keywords in headline/meta
+  section_raw <- str_extract(meta_clean,
+    "(?i)(opinion|editorial|op.ed|commentary|column|news|features?|world|politics?|health|science)")
+  # Flag obvious opinion content
+  is_opinion <- as.integer(
+    str_detect(tolower(meta_clean), "opinion|editorial|op-ed|op ed|commentary|column") |
+    str_detect(tolower(headline %||% ""), "opinion|editorial|op-ed|commentary")
+  )
+
+  # --- US story filter ---
+  # TV networks are always US; for print, flag non-US stories by checking
+  # whether the story contains US geographic anchors or an explicit international tag.
+  US_STATES <- paste(c(
+    "alabama","alaska","arizona","arkansas","california","colorado","connecticut",
+    "delaware","florida","georgia","idaho","illinois","indiana","iowa","kansas",
+    "kentucky","louisiana","maine","maryland","massachusetts","michigan","minnesota",
+    "mississippi","missouri","montana","nebraska","nevada","new hampshire",
+    "new jersey","new mexico","new york","north carolina","north dakota","ohio",
+    "oklahoma","oregon","pennsylvania","rhode island","south carolina","south dakota",
+    "tennessee","texas","utah","vermont","virginia","washington","west virginia",
+    "wisconsin","wyoming","washington d.c.","district of columbia",
+    "congress","senate","supreme court","white house","planned parenthood",
+    "united states","american","u.s."
+  ), collapse = "|")
+  is_us_story <- as.integer(
+    media_type == "tv" |
+    str_detect(factiva_region, "Domestic") |
+    str_detect(tolower(body_text), US_STATES)
+  )
 
   # --- Abortion segment lede: 200 words starting where abortion is first mentioned ---
   # These are whole broadcast transcripts; the abortion segment can appear anywhere.
@@ -444,39 +511,40 @@ parse_story <- function(raw_block, file_network) {
     sum(sapply(variants, function(v) str_count(body_lower, fixed(tolower(v)))))
   })
 
-  show_clean <- source_line %||% ""
-  # Remove network prefixes like "NBC News:", "Fox News:", "Fox News Channel:"
-  show_clean <- str_replace(show_clean, "^(NBC|CBS|ABC|Fox|PBS) News(Hour)?(\\s+Channel)?:\\s*", "")
-  # Remove trailing Factiva 3-6 char uppercase source codes and everything after
-  # e.g. "Nightly News NTLN English" -> "Nightly News", "MacCallum HUN" -> "MacCallum"
-  show_clean <- str_remove(show_clean, "\\s+[A-Z]{3,6}(\\s.*)?$")
-  show_clean <- str_squish(show_clean)
-  # If show name is suspiciously long (>60 chars) it's probably a headline not a show — clear it
-  if (nchar(show_clean) > 60) show_clean <- NA_character_
-
   as_tibble(c(
     list(
-      network       = network,
-      show          = show_clean,
-      story_date    = date_parsed,
-      headline      = headline,
-      story_trigger = story_trigger,
-      story_lede    = story_lede,
-      story_text    = body_text,
-      word_count    = str_count(body_text, "\\S+")
+      network        = network,
+      media_type     = media_type,
+      show           = show_clean,
+      publication    = publication,
+      section        = section_raw %||% NA_character_,
+      is_opinion     = is_opinion,
+      is_us_story    = is_us_story,
+      factiva_region = factiva_region,
+      story_date     = date_parsed,
+      headline       = headline,
+      story_trigger  = story_trigger,
+      story_lede     = story_lede,
+      story_text     = body_text,
+      word_count     = str_count(body_text, "\\S+")
     ),
     as.list(phrase_counts)
   ))
 }
 
-# Infer network from filename
+# Infer network/outlet from filename
 network_from_filename <- function(fname) {
   fname_upper <- toupper(basename(fname))
+  if (str_detect(fname_upper, "MSNBC"))    return("MSNBC")   # check before NBC
   if (str_detect(fname_upper, "NBC"))      return("NBC")
   if (str_detect(fname_upper, "CBS"))      return("CBS")
   if (str_detect(fname_upper, "ABC"))      return("ABC")
   if (str_detect(fname_upper, "FOX"))      return("FOX")
   if (str_detect(fname_upper, "PBS"))      return("PBS")
+  if (str_detect(fname_upper, "NYT|NEW.YORK.TIMES")) return("NYT")
+  if (str_detect(fname_upper, "GUARDIAN")) return("GUARDIAN")
+  if (str_detect(fname_upper, "WSJ|WALL.STREET"))    return("WSJ")
+  if (str_detect(fname_upper, "WAPO|WASHPOST|WASHINGTON.POST")) return("WAPO")
   return(NA_character_)
 }
 
