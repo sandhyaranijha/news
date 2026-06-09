@@ -94,13 +94,13 @@ strip_rtf <- function(rtf_text) {
 
 # Parse a single story block (everything after {*\bkmkstart tocN})
 parse_story <- function(raw_block, file_network) {
-  # Strip the leading "N}{*\bkmkend tocN}" prefix using fixed split
+  # Format A blocks start with "N}{*\bkmkend tocN}" — strip that prefix
   end_marker <- paste0("\\bkmkend toc")
   if (str_detect(raw_block, fixed(end_marker))) {
     block <- str_split(raw_block, fixed(end_marker), n = 2)[[1]][2]
-    # Remove the closing "N}" from the marker
     block <- sub("^\\d+\\}", "", block)
   } else {
+    # Format B: block starts directly with \par or \b headline
     block <- raw_block
   }
 
@@ -160,10 +160,15 @@ parse_story <- function(raw_block, file_network) {
     sum(sapply(variants, function(v) str_count(body_lower, fixed(tolower(v)))))
   })
 
-  show_clean <- str_squish(str_replace_all(
-    source_line %||% "", "NBC News:|CBS News:|ABC News:|FOX News:|PBS NewsHour", ""))
-  # Remove source code suffix (e.g. "NTLN English", "MTPR English")
-  show_clean <- str_squish(str_remove(show_clean, "\\s+[A-Z]{3,6}\\s+English.*$"))
+  show_clean <- source_line %||% ""
+  # Remove network prefixes like "NBC News:", "Fox News:", "Fox News Channel:"
+  show_clean <- str_replace(show_clean, "^(NBC|CBS|ABC|Fox|PBS) News(Hour)?(\\s+Channel)?:\\s*", "")
+  # Remove trailing Factiva 3-6 char uppercase source codes and everything after
+  # e.g. "Nightly News NTLN English" -> "Nightly News", "MacCallum HUN" -> "MacCallum"
+  show_clean <- str_remove(show_clean, "\\s+[A-Z]{3,6}(\\s.*)?$")
+  show_clean <- str_squish(show_clean)
+  # If show name is suspiciously long (>60 chars) it's probably a headline not a show — clear it
+  if (nchar(show_clean) > 60) show_clean <- NA_character_
 
   as_tibble(c(
     list(
@@ -196,17 +201,26 @@ process_rtf_file <- function(filepath) {
   raw <- read_file(filepath, locale = locale(encoding = "latin1"))
   network <- network_from_filename(filepath)
 
-  # Split on Factiva bookmark markers: literal string {\*\bkmkstart toc
-  MARKER <- paste0("{", "\\*\\bkmkstart toc")
-  story_blocks <- str_split(raw, fixed(MARKER))[[1]]
+  # Factiva exports come in two formats:
+  #   Format A (multi-story with TOC): stories split by {\*\bkmkstart toc
+  #   Format B (no TOC):               stories split by \page
+  BOOKMARK_MARKER <- paste0("{", "\\*\\bkmkstart toc")
 
-  if (length(story_blocks) <= 1) {
+  if (str_detect(raw, fixed(BOOKMARK_MARKER))) {
+    # Format A
+    story_blocks <- str_split(raw, fixed(BOOKMARK_MARKER))[[1]][-1]  # drop TOC
+  } else {
+    # Format B — split on \page, keep only blocks that contain story metadata
+    story_blocks <- str_split(raw, fixed("\\page"))[[1]]
+    # Keep only blocks that have a date and source line
+    story_blocks <- story_blocks[str_detect(story_blocks, fixed("\\uc2")) &
+                                   str_detect(story_blocks, "\\d{4}")]
+  }
+
+  if (length(story_blocks) == 0) {
     warning("No story blocks found in: ", filepath)
     return(NULL)
   }
-
-  # First block is the TOC / header — skip it
-  story_blocks <- story_blocks[-1]
 
   message("  Found ", length(story_blocks), " stories")
 
