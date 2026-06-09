@@ -427,11 +427,19 @@ parse_story <- function(raw_block, file_network) {
   }
   lede_lower <- tolower(story_lede)
 
-  # --- Trigger classification (from abortion segment lede only) ---
-  story_trigger <- classify_trigger(lede_lower)
-
   # --- Phrase counts (full story text) ---
   body_lower <- tolower(body_text)
+
+  # --- Trigger classification ---
+  # Primary: use the abortion segment lede (200 words) — captures what prompted
+  # THIS story specifically.
+  # Fallback: if lede returns "other", search the full text — catches patient/
+  # medical-case stories where the triggering legislation is named later in the
+  # piece (e.g. "she was denied care under [state]'s new law").
+  story_trigger <- classify_trigger(lede_lower)
+  if (story_trigger == "other") {
+    story_trigger <- classify_trigger(body_lower)
+  }
   phrase_counts <- sapply(PHRASE_LIST, function(variants) {
     sum(sapply(variants, function(v) str_count(body_lower, fixed(tolower(v)))))
   })
