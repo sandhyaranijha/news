@@ -609,7 +609,11 @@ parse_story <- function(raw_block, file_network) {
       story_trigger  = story_trigger,
       story_lede     = story_lede,
       story_text     = body_text,
-      word_count     = str_count(body_text, "\\S+")
+      word_count     = str_count(body_text, "\\S+"),
+      is_live_blog   = as.integer(
+        str_detect(tolower(headline %||% ""), "as it happened|live updates|live blog|rolling coverage") |
+        (media_type == "print" & str_count(body_text, "\\S+") > 3000)
+      )
     ),
     as.list(phrase_counts)
   ))
@@ -625,7 +629,7 @@ network_from_filename <- function(fname) {
   if (str_detect(fname_upper, "FOX"))      return("FOX")
   if (str_detect(fname_upper, "PBS"))      return("PBS")
   if (str_detect(fname_upper, "NYT|NEW.YORK.TIMES")) return("NYT")
-  if (str_detect(fname_upper, "GUARDIAN")) return("GUARDIAN")
+  if (str_detect(fname_upper, "GUARDIAN|GUARD")) return("GUARDIAN")
   if (str_detect(fname_upper, "WSJ|WALL.STREET"))    return("WSJ")
   if (str_detect(fname_upper, "WAPO|WASHPOST|WASHINGTON.POST")) return("WAPO")
   return(NA_character_)
