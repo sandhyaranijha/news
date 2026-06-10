@@ -196,6 +196,38 @@ PHRASE_LIST <- list(
   women_affected         = c("women affected", "women impacted", "patients affected",
                               "women who", "women are"),
 
+  # --- Religious framing (count column — fires even when not primary trigger) ---
+  # Catholic
+  religion_catholic      = c("pope", "pope francis", "vatican", "catholic church",
+                              "catholic bishop", "bishop", "archbishop", "cardinal",
+                              "diocese", "papal", "usccb",
+                              "united states conference of catholic bishops"),
+  # Evangelical / Protestant
+  religion_evangelical   = c("evangelical", "southern baptist", "evangelical christian",
+                              "evangelical church", "methodist", "presbyterian",
+                              "lutheran", "protestant"),
+  # Jewish (notable: Jewish law often requires abortion — a distinct angle)
+  religion_jewish        = c("jewish law", "halacha", "halakha", "rabbi",
+                              "jewish community", "jewish values", "religious jewish"),
+  # Muslim
+  religion_muslim        = c("imam", "islamic", "muslim community"),
+  # Religious liberty / conscience framing
+  religion_liberty       = c("religious freedom", "religious liberty",
+                              "religious exemption", "conscience clause",
+                              "conscience exemption", "faith-based"),
+  # Progressive religious voices (often underreported)
+  religion_progressive   = c("progressive faith", "progressive religion",
+                              "religious coalition", "clergy for choice",
+                              "religious left", "faith community", "faith leader"),
+  # Moral / scriptural language
+  # NOTE: avoid short substrings like "sin" (matches "decision", "single", etc.)
+  religion_moral         = c("god's will", "god's plan", "playing god",
+                              "prayer vigil", "praying outside", "prayer outside",
+                              "abortion is a sin", "it is a sin",
+                              "moral teaching", "church teaching",
+                              "scripture", "biblical", "the bible says",
+                              "sanctity of life"),
+
   # --- "Every life matters" / moral framing language ---
   every_life             = c("every life", "every human life", "sanctity of life",
                               "sacred life", "human dignity"),
@@ -326,6 +358,33 @@ TRIGGER_LIST <- list(
     "a new study", "new research", "according to new data",
     "polling shows", "survey found", "study found", "report found",
     "according to the guttmacher", "cdc data", "new numbers"
+  ),
+
+  # 10. Religion — fires last so patient/political stories that mention clergy
+  # in passing aren't misclassified. Uses specific institutional phrases only,
+  # not generic words like "prayer" or "sin" that appear in any context.
+  religion = c(
+    # Catholic institutional phrases
+    "pope francis", "the vatican", "catholic church", "catholic bishop",
+    "archbishop", "cardinal", "diocese", "papal", "encyclical",
+    "united states conference of catholic bishops", "usccb",
+    # Evangelical / Protestant institutional
+    "evangelical", "southern baptist", "evangelical christian",
+    "evangelical church",
+    # Jewish (Jewish law requires abortion in some cases — major post-Dobbs angle)
+    "jewish law", "halacha", "halakha", "rabbi",
+    "jewish values", "under jewish law",
+    # Muslim
+    "islamic law", "muslim community", "according to islam",
+    # Religious liberty framing
+    "religious freedom", "religious liberty", "religious exemption",
+    "conscience clause", "conscience exemption",
+    # Progressive religious voices
+    "progressive faith", "religious coalition", "clergy for choice",
+    "religious left", "religious right", "faith-based organization",
+    # Doctrinal/scriptural framing
+    "god's will", "god's plan", "church teaching",
+    "scripture", "biblical teaching", "the bible teaches"
   )
 )
 
