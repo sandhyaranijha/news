@@ -750,3 +750,40 @@ df %>%
   count(network, story_trigger) %>%
   tidyr::pivot_wider(names_from = story_trigger, values_from = n, values_fill = 0) %>%
   print()
+
+# ---------------------------------------------------------------------------
+# AIRTIME NORMALIZATION (TV only)
+# Weekly broadcast hours per network, used to compute stories per 100 hrs.
+# Print outlets (NYT, WSJ, Guardian) are excluded — daily publication
+# doesn't map cleanly to an hourly airtime equivalent.
+# ---------------------------------------------------------------------------
+
+TV_HOURS_PER_WEEK <- c(
+  ABC   = 13.5,
+  CBS   = 13.5,
+  NBC   = 18.5,
+  FOX   =  67,
+  MSNBC =  45,
+  PBS   =   5
+)
+
+# Compute study period in weeks from the actual data
+tv_df <- df %>%
+  filter(media_type == "tv", !is.na(story_date), is_live_blog == 0)
+
+study_start <- min(tv_df$story_date, na.rm = TRUE)
+study_end   <- max(tv_df$story_date, na.rm = TRUE)
+study_weeks <- as.numeric(difftime(study_end, study_start, units = "weeks"))
+
+airtime_norm <- tv_df %>%
+  count(network, name = "stories") %>%
+  filter(network %in% names(TV_HOURS_PER_WEEK)) %>%
+  mutate(
+    hrs_per_week      = TV_HOURS_PER_WEEK[network],
+    total_hours       = round(hrs_per_week * study_weeks),
+    stories_per_100hr = round(stories / total_hours * 100, 2)
+  )
+
+message("\n=== TV airtime normalization ===")
+message(sprintf("Study period: %s to %s (%.1f weeks)", study_start, study_end, study_weeks))
+print(airtime_norm)
