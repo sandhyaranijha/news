@@ -91,13 +91,17 @@ PHRASE_LIST <- list(
   terminate_pregnancy    = c("terminate a pregnancy", "termination of pregnancy",
                               "end a pregnancy", "ending a pregnancy"),
   anti_abortion          = c("anti-abortion"),
-  abortion_opponent      = c("abortion opponent", "abortion foe", "abortion critic"),
+  abortion_opponent      = c("abortion opponent", "abortion opponents",
+                              "opponents of abortion", "opponent of abortion",
+                              "abortion foe", "abortion foes",
+                              "abortion critic", "abortion critics"),
 
   # --- Labels used for each side (tracks whose language the anchor adopts) ---
   # Pro-restriction side labels
   label_prolife          = c("pro-life", "pro life", "life advocate",
                               "life supporter", "right to life advocate"),
-  label_antiabortion     = c("anti-abortion", "abortion opponent", "abortion foe"),
+  label_antiabortion     = c("anti-abortion", "abortion opponent", "abortion opponents",
+                              "opponents of abortion", "abortion foe", "abortion foes"),
   # Pro-access side labels
   label_prochoice        = c("pro-choice", "pro choice", "choice advocate"),
   label_abortionrights   = c("abortion rights advocate", "abortion rights supporter",
