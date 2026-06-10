@@ -69,3 +69,6 @@ date,state,level,event_type,description,outcome,source
 2025-03-31,Federal,federal,executive,Trump administration freezes Title X family planning funding to 16 grantees including all 9 Planned Parenthood affiliates — affects 879 clinics in 23 states,Enacted,Washington Post / KFF
 2025-05-01,Federal,federal,executive,HHS Secretary RFK Jr. announces FDA review of mifepristone safety regulations — could restrict mail-order access or require in-person prescriptions,Under review,CNBC / ACLU
 2025-06-03,Federal,federal,executive,Trump administration rescinds Biden-era EMTALA guidance requiring hospitals to provide emergency abortions in states with bans; CMS says will still enforce EMTALA broadly,Enacted,Washington Post / ACLU
+2026-05-01,Federal,federal,litigation,5th Circuit rules mifepristone must be dispensed in-person only — blocks FDA telehealth/mail prescribing rules,Blocked mail access — immediately challenged,NPR / CNN / STAT News
+2026-05-04,Federal,federal,scotus,Justice Alito issues emergency 1-week stay of 5th Circuit mifepristone ruling,Mail access temporarily preserved,NPR / CNN
+2026-05-14,Federal,federal,scotus,Supreme Court rules mifepristone can continue to be prescribed via telehealth and mailed — stays 5th Circuit ruling while Louisiana v. FDA proceeds,Mail/telehealth access preserved pending litigation,NPR / CNN
