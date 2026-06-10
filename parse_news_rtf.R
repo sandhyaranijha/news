@@ -610,6 +610,17 @@ parse_story <- function(raw_block, file_network) {
       story_lede     = story_lede,
       story_text     = body_text,
       word_count     = str_count(body_text, "\\S+"),
+      core_abortion_count = sum(sapply(
+        c("abortion", "roe v. wade", "roe v wade", "dobbs", "mifepristone",
+          "misoprostol", "abortion ban", "abortion law", "abortion right",
+          "abortion access", "abortion care", "abortion restrict",
+          "reproductive right", "reproductive health", "reproductive freedom",
+          "pro-life", "pro-choice", "pro life", "pro choice",
+          "abortion pill", "medication abortion", "planned parenthood",
+          "fetal heartbeat", "six-week", "gestational", "terminate the pregnancy",
+          "termination of pregnancy"),
+        function(v) str_count(body_lower, fixed(tolower(v)))
+      )),
       is_live_blog   = as.integer(
         str_detect(tolower(headline %||% ""), "as it happened|live updates|live blog|rolling coverage") |
         (media_type == "print" & str_count(body_text, "\\S+") > 3000)
