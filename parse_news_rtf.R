@@ -453,6 +453,9 @@ parse_story <- function(raw_block, file_network) {
 
   # --- Metadata (first part before copyright) ---
   meta_raw <- str_split(block, fixed("Content and programming copyright"), n = 2)[[1]][1]
+  # Remove embedded image groups ({\pict...}) before stripping — their hex data
+  # can span thousands of chars and contains spurious keyword matches.
+  meta_raw <- gsub("\\{[^{}]*\\\\pict[^{}]*\\}", " ", meta_raw, perl = TRUE)
   meta_clean <- strip_rtf(meta_raw)
   meta_lines <- str_split(meta_clean, "\\s{2,}")[[1]]
   meta_lines <- meta_lines[nchar(str_squish(meta_lines)) > 0]
@@ -518,12 +521,15 @@ parse_story <- function(raw_block, file_network) {
   }
 
   # --- Section (Opinion, News, Features, etc.) ---
-  # Factiva sometimes includes section info; also detect from keywords in headline/meta
-  section_raw <- str_extract(meta_clean,
-    "(?i)(opinion|editorial|op.ed|commentary|column|news|features?|world|politics?|health|science)")
+  # Only scan the first 600 chars of meta_clean — the section label appears near the
+  # top of each Factiva block, well before any embedded image hex data that could
+  # contain spurious keyword matches.
+  meta_head <- substr(meta_clean, 1, 600)
+  section_raw <- str_extract(meta_head,
+    "(?i)(opinion|editorial|op.ed|commentary|review & outlook|letters to the editor|news|features?|world|politics?|health|science)")
   # Flag obvious opinion content
   is_opinion <- as.integer(
-    str_detect(tolower(meta_clean), "opinion|editorial|op-ed|op ed|commentary|column") |
+    str_detect(tolower(meta_head), "opinion|editorial|op-ed|op ed|commentary|review & outlook|letters to the editor") |
     str_detect(tolower(headline %||% ""), "opinion|editorial|op-ed|commentary")
   )
 
