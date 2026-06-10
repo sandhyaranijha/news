@@ -460,10 +460,11 @@ parse_story <- function(raw_block, file_network) {
   # Date: looks like "17 May 2023" or "June 17, 2023"
   date_raw <- str_extract(meta_clean,
     "\\d{1,2} (?:January|February|March|April|May|June|July|August|September|October|November|December) \\d{4}|(?:January|February|March|April|May|June|July|August|September|October|November|December) \\d{1,2},? \\d{4}")
-  date_parsed <- tryCatch(
-    as.Date(date_raw, format = c("%d %B %Y", "%B %d %Y", "%B %d, %Y")),
-    error = function(e) NA
-  )
+  date_parsed <- as.Date(NA_character_)
+  for (fmt in c("%d %B %Y", "%B %d %Y", "%B %d, %Y")) {
+    d <- tryCatch(as.Date(date_raw, format = fmt), error = function(e) as.Date(NA_character_))
+    if (!is.na(d)) { date_parsed <- d; break }
+  }
 
   # Show name: bold text before b0
   show_name <- headline  # fallback
