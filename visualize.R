@@ -510,3 +510,106 @@ ggsave("chart3_bubble_phrases.png", p3,
        width = 18, height = 10, dpi = 150)
 
 message("Saved: chart3_bubble_phrases.png")
+
+# ---------------------------------------------------------------------------
+# CHART 4: Story trigger heatmap — network × trigger × period
+# ---------------------------------------------------------------------------
+
+# Define administration period labels
+period_breaks <- as.Date(c("2021-01-20", "2022-06-24", "2025-01-20"))
+
+tv4 <- read_csv("news_stories.csv", show_col_types = FALSE) |>
+  filter(
+    media_type          == "tv",
+    !is.na(story_date),
+    is_live_blog        == 0,
+    core_abortion_count >= 3,
+    network             %in% names(TV_HOURS_PER_WEEK),
+    !is.na(story_trigger)
+  ) |>
+  mutate(
+    period = case_when(
+      story_date < as.Date("2022-06-24") ~ "Biden pre-Dobbs\n(Jan 2021–Jun 2022)",
+      story_date < as.Date("2025-01-20") ~ "Biden post-Dobbs\n(Jun 2022–Jan 2025)",
+      TRUE                               ~ "Trump II\n(Jan 2025–present)"
+    ),
+    period = factor(period, levels = c(
+      "Biden pre-Dobbs\n(Jan 2021–Jun 2022)",
+      "Biden post-Dobbs\n(Jun 2022–Jan 2025)",
+      "Trump II\n(Jan 2025–present)"
+    ))
+  )
+
+# Count stories per network × trigger × period, normalize to % within network+period
+heatmap_data <- tv4 |>
+  count(network, period, story_trigger) |>
+  group_by(network, period) |>
+  mutate(pct = n / sum(n) * 100) |>
+  ungroup() |>
+  mutate(
+    story_trigger = recode(story_trigger,
+      "supreme_court_ruling"     = "Supreme Court ruling",
+      "federal_executive"        = "Federal executive action",
+      "state_legislation"        = "State legislation",
+      "election_campaign"        = "Election / campaign",
+      "protest_mobilization"     = "Protest / mobilization",
+      "patient_medical_case"     = "Patient / medical case",
+      "political_controversy"    = "Political controversy",
+      "anniversary_retrospective"= "Anniversary / retrospective",
+      "poll_research"            = "Poll / research",
+      "religion"                 = "Religion",
+      "other"                    = "Other"
+    ),
+    story_trigger = factor(story_trigger, levels = rev(c(
+      "Supreme Court ruling",
+      "Federal executive action",
+      "State legislation",
+      "Election / campaign",
+      "Patient / medical case",
+      "Political controversy",
+      "Protest / mobilization",
+      "Poll / research",
+      "Anniversary / retrospective",
+      "Religion",
+      "Other"
+    )))
+  )
+
+p4 <- ggplot(heatmap_data,
+             aes(x = network, y = story_trigger, fill = pct)) +
+
+  geom_tile(color = "white", linewidth = 0.5) +
+
+  geom_text(aes(label = ifelse(pct >= 3, sprintf("%.0f%%", pct), "")),
+            size = 2.8, color = "white", fontface = "bold") +
+
+  scale_fill_gradient(low = "#f7f0e6", high = "#c0392b",
+                      name = "% of stories\nin period",
+                      limits = c(0, NA)) +
+
+  facet_wrap(~ period, nrow = 1) +
+
+  labs(
+    title    = "What Drives Abortion Coverage? Story Triggers by Network and Period",
+    subtitle = "TV only · Cell = % of each network's stories in that period · Stories with 3+ core abortion mentions",
+    x        = NULL,
+    y        = NULL,
+    caption  = "Sources: Factiva RTF exports. Periods: Biden pre-Dobbs, Biden post-Dobbs, Trump II."
+  ) +
+
+  theme_minimal(base_size = 11) +
+  theme(
+    plot.title       = element_text(face = "bold", size = 13),
+    plot.subtitle    = element_text(size = 8, color = "gray40"),
+    axis.text.x      = element_text(angle = 45, hjust = 1, size = 10, face = "bold"),
+    axis.text.y      = element_text(size = 9),
+    strip.text       = element_text(face = "bold", size = 10),
+    legend.position  = "right",
+    panel.grid       = element_blank(),
+    plot.caption     = element_text(size = 7, color = "gray50")
+  )
+
+ggsave("chart4_trigger_heatmap.png", p4,
+       width = 14, height = 7, dpi = 150)
+
+message("Saved: chart4_trigger_heatmap.png")
