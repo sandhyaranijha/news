@@ -226,3 +226,162 @@ ggsave("chart1b_tv_volume_raw.png", p1b,
        width = 12, height = 6, dpi = 150)
 
 message("Saved: chart1b_tv_volume_raw.png")
+
+# ---------------------------------------------------------------------------
+# CHART 2: Framing language trends over time, by network
+# Four phrase pairs showing opposing framings
+# Expressed as mentions per 100 stories, 3-month rolling average
+# ---------------------------------------------------------------------------
+
+# Define phrase groups — each group is summed into one score
+PHRASE_GROUPS <- list(
+  "Pro-life framing"      = c("pro_life", "label_prolife", "called_prolife"),
+  "Pro-choice framing"    = c("pro_choice", "label_prochoice", "called_prochoice",
+                               "label_abortionrights"),
+  "Fetal/unborn language" = c("fetus", "unborn", "baby_fetus", "preborn"),
+  "Pregnant women/people" = c("pregnant_women", "pregnant_people", "mother_language"),
+  "Ban/restriction frame" = c("abortion_ban", "abortion_restriction"),
+  "Rights/access frame"   = c("abortion_rights", "abortion_access", "reproductive_rights",
+                               "bodily_autonomy"),
+  "Patient impact"        = c("patient_impact", "women_affected"),
+  "Medical/clinical"      = c("medical_necessity")
+)
+
+# Pair labels for faceting (4 pairs, each with 2 lines)
+PAIRS <- list(
+  list(a = "Pro-life framing",      b = "Pro-choice framing",
+       label = "Pro-life vs. Pro-choice framing"),
+  list(a = "Fetal/unborn language", b = "Pregnant women/people",
+       label = "Fetal/unborn vs. Pregnant women framing"),
+  list(a = "Ban/restriction frame", b = "Rights/access frame",
+       label = "Ban/restriction vs. Rights/access framing"),
+  list(a = "Patient impact",        b = "Medical/clinical",
+       label = "Patient impact vs. Medical/clinical language")
+)
+
+tv_framing <- d |>
+  filter(media_type == "tv", is_live_blog == 0,
+         core_abortion_count >= 3, !is.na(story_date),
+         network %in% names(NET_COLORS)) |>
+  mutate(month = as.Date(format(story_date, "%Y-%m-01")))
+
+# Pre-compute group sums as new columns, then aggregate monthly
+for (grp_name in names(PHRASE_GROUPS)) {
+  cols <- intersect(PHRASE_GROUPS[[grp_name]], names(tv_framing))
+  tv_framing[[grp_name]] <- rowSums(tv_framing[, cols, drop = FALSE], na.rm = TRUE)
+}
+
+grp_names <- names(PHRASE_GROUPS)
+
+rates <- tv_framing |>
+  group_by(network, month) |>
+  summarise(
+    n_stories = n(),
+    across(all_of(grp_names), \(x) sum(x, na.rm = TRUE)),
+    .groups = "drop"
+  ) |>
+  mutate(across(all_of(grp_names),
+                \(x) x / n_stories * 100,
+                .names = "rate_{.col}"))
+
+# Build long-form data for each pair
+pair_data <- lapply(PAIRS, function(p) {
+  rates |>
+    mutate(
+      val_a = .data[[paste0("rate_", p$a)]],
+      val_b = .data[[paste0("rate_", p$b)]]
+    ) |>
+    select(network, month, val_a, val_b) |>
+    tidyr::pivot_longer(c(val_a, val_b),
+                        names_to = "side",
+                        values_to = "rate_per_100") |>
+    mutate(
+      phrase_group = if_else(side == "val_a", p$a, p$b),
+      pair_label   = p$label,
+      line_type    = if_else(side == "val_a", "solid", "dashed")
+    )
+}) |> bind_rows()
+
+# Smooth within network + phrase_group
+pair_data <- pair_data |>
+  arrange(network, phrase_group, month) |>
+  group_by(network, phrase_group) |>
+  mutate(rate_smooth = rollmean(rate_per_100, k = 3, fill = NA, align = "center")) |>
+  ungroup()
+
+pair_data$network     <- factor(pair_data$network, levels = names(NET_COLORS))
+pair_data$pair_label  <- factor(pair_data$pair_label,
+                                 levels = sapply(PAIRS, `[[`, "label"))
+
+# Colour: use phrase group label mapped to two colours per pair
+FRAME_COLORS <- c(
+  "Pro-life framing"      = "#d62728",
+  "Pro-choice framing"    = "#1f77b4",
+  "Fetal/unborn language" = "#d62728",
+  "Pregnant women/people" = "#1f77b4",
+  "Ban/restriction frame" = "#d62728",
+  "Rights/access frame"   = "#1f77b4",
+  "Patient impact"        = "#2ca02c",
+  "Medical/clinical"      = "#9467bd"
+)
+
+p2 <- ggplot(pair_data,
+             aes(x = month, y = rate_smooth,
+                 color = phrase_group, linetype = phrase_group,
+                 group = interaction(network, phrase_group))) +
+
+  # Admin shading
+  geom_rect(data = ADMIN_PERIODS,
+            aes(xmin = start, xmax = end, ymin = -Inf, ymax = Inf, fill = label),
+            inherit.aes = FALSE, alpha = 0.10) +
+  scale_fill_manual(values = c("Biden" = "#d6e4f0", "Trump II" = "#fde8d8"),
+                    name = "Administration") +
+
+  # Dobbs line
+  geom_vline(xintercept = as.Date("2022-06-24"),
+             linetype = "dashed", color = "firebrick", linewidth = 0.5) +
+
+  geom_line(linewidth = 0.75, na.rm = TRUE) +
+
+  scale_color_manual(values = FRAME_COLORS, name = "Phrase group") +
+  scale_linetype_manual(
+    values = setNames(
+      rep(c("solid","dashed"), 4),
+      c("Pro-life framing","Pro-choice framing",
+        "Fetal/unborn language","Pregnant women/people",
+        "Ban/restriction frame","Rights/access frame",
+        "Patient impact","Medical/clinical")
+    ),
+    name = "Phrase group"
+  ) +
+
+  facet_grid(pair_label ~ network, scales = "free_y") +
+
+  scale_x_date(date_breaks = "1 year", date_labels = "%Y",
+               expand = expansion(mult = c(0.01, 0.02))) +
+
+  labs(
+    title    = "Abortion Framing Language by Network, 2021–2026",
+    subtitle = "Mentions per 100 stories · 3-month rolling average · TV only",
+    x        = NULL,
+    y        = "Mentions per 100 stories",
+    caption  = "Dashed vertical line = Dobbs decision (Jun 2022). Sources: Factiva RTF exports"
+  ) +
+
+  theme_minimal(base_size = 10) +
+  theme(
+    plot.title       = element_text(face = "bold", size = 13),
+    plot.subtitle    = element_text(size = 8, color = "gray40"),
+    axis.text.x      = element_text(angle = 45, hjust = 1, size = 7),
+    axis.text.y      = element_text(size = 7),
+    strip.text.x     = element_text(face = "bold", size = 9),
+    strip.text.y     = element_text(size = 7.5, angle = 0, hjust = 0),
+    legend.position  = "bottom",
+    panel.grid.minor = element_blank(),
+    plot.caption     = element_text(size = 7, color = "gray50")
+  )
+
+ggsave("chart2_framing_language.png", p2,
+       width = 16, height = 12, dpi = 150)
+
+message("Saved: chart2_framing_language.png")
