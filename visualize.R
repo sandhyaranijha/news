@@ -154,3 +154,75 @@ ggsave("chart1_tv_volume_normalized.png", p1,
        width = 12, height = 6, dpi = 150)
 
 message("Saved: chart1_tv_volume_normalized.png")
+
+# ---------------------------------------------------------------------------
+# CHART 1b: Raw story counts (no normalization)
+# ---------------------------------------------------------------------------
+
+monthly <- monthly |>
+  arrange(network, month) |>
+  group_by(network) |>
+  mutate(n_smooth = rollmean(n, k = 3, fill = NA, align = "center")) |>
+  ungroup()
+
+p1b <- ggplot(monthly, aes(x = month, y = n_smooth, color = network)) +
+
+  geom_rect(data = ADMIN_PERIODS,
+            aes(xmin = start, xmax = end, ymin = -Inf, ymax = Inf, fill = label),
+            inherit.aes = FALSE, alpha = 0.12) +
+  scale_fill_manual(values = c("Biden" = "#d6e4f0", "Trump II" = "#fde8d8"),
+                    name = "Administration") +
+
+  geom_vline(data = KEY_EVENTS,
+             aes(xintercept = date, color = label),
+             linetype = "dashed", linewidth = 0.7, inherit.aes = FALSE) +
+  scale_color_manual(
+    values = c(NET_COLORS,
+               "Dobbs"    = "firebrick",
+               "Trump II" = "darkorange"),
+    name = NULL
+  ) +
+
+  geom_vline(xintercept = WEISS_DATE, linetype = "dotted",
+             color = "darkgreen", linewidth = 0.7) +
+  annotate("text", x = WEISS_DATE, y = Inf,
+           label = "Weiss/CBS", hjust = -0.1, vjust = 1.5,
+           size = 2.8, color = "darkgreen") +
+
+  geom_line(linewidth = 0.9, na.rm = TRUE) +
+
+  geom_text(data = KEY_EVENTS,
+            aes(x = date, y = Inf, label = label, color = label),
+            hjust = -0.15, vjust = 1.5, size = 2.8, inherit.aes = FALSE) +
+
+  scale_x_date(date_breaks = "6 months", date_labels = "%b '%y",
+               expand = expansion(mult = c(0.01, 0.03))) +
+  scale_y_continuous(expand = expansion(mult = c(0, 0.08))) +
+
+  labs(
+    title    = "Abortion Coverage by TV Network, 2021–2026",
+    subtitle = "Raw story count per month · 3-month rolling average · Stories with 3+ core abortion mentions",
+    x        = NULL,
+    y        = "Stories per month",
+    caption  = "Sources: Factiva RTF exports"
+  ) +
+
+  theme_minimal(base_size = 12) +
+  theme(
+    plot.title       = element_text(face = "bold", size = 14),
+    plot.subtitle    = element_text(size = 9, color = "gray40"),
+    axis.text.x      = element_text(angle = 45, hjust = 1, size = 8),
+    legend.position  = "right",
+    panel.grid.minor = element_blank(),
+    plot.caption     = element_text(size = 7, color = "gray50")
+  ) +
+
+  guides(
+    color = guide_legend(order = 1, override.aes = list(linewidth = 1.5)),
+    fill  = guide_legend(order = 2)
+  )
+
+ggsave("chart1b_tv_volume_raw.png", p1b,
+       width = 12, height = 6, dpi = 150)
+
+message("Saved: chart1b_tv_volume_raw.png")
