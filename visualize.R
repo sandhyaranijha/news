@@ -385,3 +385,128 @@ ggsave("chart2_framing_language.png", p2,
        width = 16, height = 12, dpi = 150)
 
 message("Saved: chart2_framing_language.png")
+
+# ---------------------------------------------------------------------------
+# CHART 3: Bubble chart — key phrase rates by network and year (TV only)
+# Y = phrase, X = network, bubble size = mentions per 100 stories
+# Color = phrase category, faceted by year
+# ---------------------------------------------------------------------------
+
+# Key phrases to include, with category labels and display names
+BUBBLE_PHRASES <- tribble(
+  ~column,               ~display,                  ~category,
+  # Pro-life framing
+  "pro_life",            "Pro-life",                "Pro-life framing",
+  "label_prolife",       "Labeled 'pro-life'",      "Pro-life framing",
+  "unborn",              "Unborn/fetus language",   "Pro-life framing",
+  "fetal_heartbeat",     "Fetal heartbeat",         "Pro-life framing",
+  # Pro-choice framing
+  "pro_choice",          "Pro-choice",              "Pro-choice framing",
+  "abortion_rights",     "Abortion rights",         "Pro-choice framing",
+  "reproductive_rights", "Reproductive rights",     "Pro-choice framing",
+  "bodily_autonomy",     "Bodily autonomy",         "Pro-choice framing",
+  # Policy/law
+  "abortion_ban",        "Abortion ban",            "Policy/law",
+  "roe_v_wade",          "Roe v. Wade",             "Policy/law",
+  "dobbs",               "Dobbs",                   "Policy/law",
+  "trigger_law",         "Trigger law",             "Policy/law",
+  # Patient impact
+  "patient_impact",      "Patient impact",          "Patient impact",
+  "women_affected",      "Women affected",          "Patient impact",
+  "rape_incest_exception","Rape/incest exception",  "Patient impact",
+  "medical_necessity",   "Medical necessity",       "Patient impact",
+  # Medical/drug
+  "mifepristone",        "Mifepristone",            "Medical/drug",
+  "abortion_pill",       "Abortion pill",           "Medical/drug",
+  # Electoral
+  "vote_voting",         "Vote/voting",             "Electoral",
+  "swing_state",         "Swing state",             "Electoral"
+)
+
+CAT_COLORS <- c(
+  "Pro-life framing"  = "#d62728",
+  "Pro-choice framing"= "#1f77b4",
+  "Policy/law"        = "#7f7f7f",
+  "Patient impact"    = "#2ca02c",
+  "Medical/drug"      = "#9467bd",
+  "Electoral"         = "#ff7f0e"
+)
+
+tv_bubble <- d |>
+  filter(media_type == "tv", is_live_blog == 0,
+         core_abortion_count >= 3, !is.na(story_date),
+         network %in% names(NET_COLORS)) |>
+  mutate(year = format(story_date, "%Y")) |>
+  filter(year %in% as.character(2021:2025))   # full years only
+
+# Compute rate per 100 stories for each phrase, by network and year
+bubble_cols <- BUBBLE_PHRASES$column
+
+bubble_rates <- tv_bubble |>
+  group_by(network, year) |>
+  summarise(
+    n_stories = n(),
+    across(all_of(bubble_cols), \(x) sum(x, na.rm = TRUE)),
+    .groups = "drop"
+  ) |>
+  mutate(across(all_of(bubble_cols),
+                \(x) x / n_stories * 100,
+                .names = "rate_{.col}")) |>
+  select(network, year, starts_with("rate_")) |>
+  tidyr::pivot_longer(starts_with("rate_"),
+                      names_to = "column",
+                      values_to = "rate_per_100") |>
+  mutate(column = sub("^rate_", "", column)) |>
+  left_join(BUBBLE_PHRASES, by = "column")
+
+bubble_rates$network  <- factor(bubble_rates$network,  levels = names(NET_COLORS))
+bubble_rates$category <- factor(bubble_rates$category, levels = names(CAT_COLORS))
+
+# Order phrases: by category then display name
+phrase_order <- BUBBLE_PHRASES |>
+  mutate(category = factor(category, levels = names(CAT_COLORS))) |>
+  arrange(category, display) |>
+  pull(display)
+bubble_rates$display <- factor(bubble_rates$display, levels = rev(phrase_order))
+
+p3 <- ggplot(bubble_rates,
+             aes(x = network, y = display,
+                 size = rate_per_100, color = category)) +
+
+  geom_point(alpha = 0.75) +
+
+  scale_size_area(max_size = 14, name = "Mentions per\n100 stories") +
+  scale_color_manual(values = CAT_COLORS, name = "Category") +
+
+  facet_wrap(~ year, nrow = 1) +
+
+  labs(
+    title    = "Key Abortion Phrases by Network and Year, 2021–2025",
+    subtitle = "TV only · Bubble size = mentions per 100 stories · Stories with 3+ core abortion mentions",
+    x        = NULL,
+    y        = NULL,
+    caption  = "Sources: Factiva RTF exports"
+  ) +
+
+  theme_minimal(base_size = 10) +
+  theme(
+    plot.title       = element_text(face = "bold", size = 13),
+    plot.subtitle    = element_text(size = 8, color = "gray40"),
+    axis.text.x      = element_text(angle = 45, hjust = 1, size = 8, face = "bold"),
+    axis.text.y      = element_text(size = 8),
+    strip.text       = element_text(face = "bold", size = 11),
+    legend.position  = "right",
+    panel.grid.major = element_line(color = "gray90"),
+    panel.grid.minor = element_blank(),
+    plot.caption     = element_text(size = 7, color = "gray50")
+  ) +
+
+  guides(
+    size  = guide_legend(order = 1),
+    color = guide_legend(order = 2, override.aes = list(size = 4))
+  )
+
+ggsave("chart3_bubble_phrases.png", p3,
+       width = 18, height = 10, dpi = 150)
+
+message("Saved: chart3_bubble_phrases.png")
