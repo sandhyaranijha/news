@@ -613,3 +613,132 @@ ggsave("chart4_trigger_heatmap.png", p4,
        width = 14, height = 7, dpi = 150)
 
 message("Saved: chart4_trigger_heatmap.png")
+
+# ---------------------------------------------------------------------------
+# CHART 5: Abortion-phrase bubbles — newspaper vs TV, 2021 and 2022
+# ---------------------------------------------------------------------------
+
+ABORTION_PHRASES <- tribble(
+  ~column,               ~display,                   ~category,
+  "pro_life",            "Pro-life",                 "Pro-life framing",
+  "label_prolife",       "Labeled 'pro-life'",       "Pro-life framing",
+  "called_prolife",      "Called 'pro-life'",        "Pro-life framing",
+  "unborn",              "Unborn/fetus",             "Pro-life framing",
+  "fetal_heartbeat",     "Fetal heartbeat",          "Pro-life framing",
+  "preborn",             "Preborn",                  "Pro-life framing",
+  "pro_choice",          "Pro-choice",               "Pro-choice framing",
+  "label_prochoice",     "Labeled 'pro-choice'",     "Pro-choice framing",
+  "abortion_rights",     "Abortion rights",          "Pro-choice framing",
+  "reproductive_rights", "Reproductive rights",      "Pro-choice framing",
+  "bodily_autonomy",     "Bodily autonomy",          "Pro-choice framing",
+  "abortion_ban",        "Abortion ban",             "Policy / law",
+  "abortion_restriction","Abortion restriction",     "Policy / law",
+  "roe_v_wade",          "Roe v. Wade",              "Policy / law",
+  "dobbs",               "Dobbs",                    "Policy / law",
+  "trigger_law",         "Trigger law",              "Policy / law",
+  "gestational_limit",   "Gestational limit",        "Policy / law",
+  "patient_impact",      "Patient impact",           "Patient impact",
+  "women_affected",      "Women affected",           "Patient impact",
+  "rape_incest_exception","Rape/incest exception",   "Patient impact",
+  "medical_necessity",   "Medical necessity",        "Patient impact",
+  "mifepristone",        "Mifepristone",             "Medical / drug",
+  "abortion_pill",       "Abortion pill",            "Medical / drug",
+  "medication_abortion", "Medication abortion",      "Medical / drug"
+)
+
+ABORTION_CAT_COLORS <- c(
+  "Pro-life framing"  = "#d62728",
+  "Pro-choice framing"= "#1f77b4",
+  "Policy / law"      = "#7f7f7f",
+  "Patient impact"    = "#2ca02c",
+  "Medical / drug"    = "#9467bd"
+)
+
+# Load full data (TV + print) for 2021-2022
+d5_raw <- read_csv("news_stories.csv", show_col_types = FALSE) |>
+  filter(
+    !is.na(story_date),
+    is_live_blog        == 0,
+    core_abortion_count >= 3,
+    as.integer(format(story_date, "%Y")) %in% c(2021, 2022)
+  ) |>
+  mutate(
+    medium = case_when(
+      media_type == "tv"    ~ "Television",
+      media_type == "print" ~ "Newspapers",
+      TRUE                  ~ NA_character_
+    ),
+    year = as.character(format(story_date, "%Y"))
+  ) |>
+  filter(!is.na(medium))
+
+# Compute rate per 100 stories for each phrase × medium × year
+phrase_cols5 <- ABORTION_PHRASES$column
+phrase_cols5 <- phrase_cols5[phrase_cols5 %in% names(d5_raw)]
+
+bubble5 <- d5_raw |>
+  group_by(medium, year) |>
+  summarise(
+    n_stories = n(),
+    across(all_of(phrase_cols5), sum, na.rm = TRUE),
+    .groups = "drop"
+  ) |>
+  pivot_longer(all_of(phrase_cols5), names_to = "column", values_to = "mentions") |>
+  mutate(rate_per_100 = mentions / n_stories * 100) |>
+  left_join(ABORTION_PHRASES, by = "column") |>
+  filter(!is.na(display)) |>
+  mutate(
+    category = factor(category, levels = names(ABORTION_CAT_COLORS)),
+    panel    = paste0(medium, "\n", year),
+    panel    = factor(panel, levels = c(
+      "Newspapers\n2021", "Television\n2021",
+      "Newspapers\n2022", "Television\n2022"
+    ))
+  )
+
+# Phrase order: by category then display
+phrase_order5 <- ABORTION_PHRASES |>
+  mutate(category = factor(category, levels = names(ABORTION_CAT_COLORS))) |>
+  arrange(category, display) |>
+  pull(display)
+bubble5$display <- factor(bubble5$display, levels = rev(phrase_order5))
+
+p5 <- ggplot(bubble5,
+             aes(x = panel, y = display,
+                 size = rate_per_100, color = category)) +
+
+  geom_point(alpha = 0.75) +
+
+  scale_size_area(max_size = 18, name = "Mentions per\n100 stories",
+                  breaks = c(5, 20, 50, 100, 200)) +
+  scale_color_manual(values = ABORTION_CAT_COLORS, name = "Category") +
+
+  labs(
+    title    = "Abortion-Related Language: Newspapers vs. Television, 2021–2022",
+    subtitle = "Bubble size = mentions per 100 stories · Stories with 3+ core abortion mentions · Excludes electoral/political phrases",
+    x        = NULL,
+    y        = NULL,
+    caption  = "Sources: Factiva RTF exports (ABC, CBS, FOX, MSNBC, NBC, PBS; NYT, WSJ, Guardian)"
+  ) +
+
+  theme_minimal(base_size = 11) +
+  theme(
+    plot.title       = element_text(face = "bold", size = 13),
+    plot.subtitle    = element_text(size = 8, color = "gray40"),
+    axis.text.x      = element_text(size = 11, face = "bold"),
+    axis.text.y      = element_text(size = 9),
+    legend.position  = "right",
+    panel.grid.major = element_line(color = "gray90"),
+    panel.grid.minor = element_blank(),
+    plot.caption     = element_text(size = 7, color = "gray50")
+  ) +
+
+  guides(
+    size  = guide_legend(order = 1),
+    color = guide_legend(order = 2, override.aes = list(size = 4))
+  )
+
+ggsave("chart5_abortion_phrases_media_year.png", p5,
+       width = 12, height = 10, dpi = 150)
+
+message("Saved: chart5_abortion_phrases_media_year.png")
