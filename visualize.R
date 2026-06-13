@@ -742,3 +742,95 @@ ggsave("chart5_abortion_phrases_media_year.png", p5,
        width = 12, height = 10, dpi = 150)
 
 message("Saved: chart5_abortion_phrases_media_year.png")
+
+# ---------------------------------------------------------------------------
+# CHART 6: 2021 newspapers — aggregate + by individual paper
+# ---------------------------------------------------------------------------
+
+d6_raw <- read_csv("news_stories.csv", show_col_types = FALSE) |>
+  filter(
+    media_type          == "print",
+    !is.na(story_date),
+    is_live_blog        == 0,
+    core_abortion_count >= 3,
+    format(story_date, "%Y") == "2021"
+  )
+
+phrase_cols6 <- ABORTION_PHRASES$column[ABORTION_PHRASES$column %in% names(d6_raw)]
+
+# Aggregate panel
+agg6 <- d6_raw |>
+  summarise(n_stories = n(),
+            across(all_of(phrase_cols6), sum, na.rm = TRUE)) |>
+  mutate(panel = "All Newspapers")
+
+# Individual papers
+ind6 <- d6_raw |>
+  group_by(network) |>
+  summarise(n_stories = n(),
+            across(all_of(phrase_cols6), sum, na.rm = TRUE),
+            .groups = "drop") |>
+  rename(panel = network)
+
+bubble6 <- bind_rows(agg6, ind6) |>
+  mutate(panel = factor(panel,
+    levels = c("All Newspapers", "NYT", "GUARDIAN", "WSJ"),
+    labels = c(
+      sprintf("All Newspapers\n(n = %d)", agg6$n_stories),
+      sprintf("New York Times\n(n = %d)", ind6$n_stories[ind6$panel == "NYT"]),
+      sprintf("The Guardian\n(n = %d)", ind6$n_stories[ind6$panel == "GUARDIAN"]),
+      sprintf("Wall St. Journal\n(n = %d)", ind6$n_stories[ind6$panel == "WSJ"])
+    )
+  )) |>
+  filter(!is.na(panel)) |>
+  pivot_longer(all_of(phrase_cols6), names_to = "column", values_to = "mentions") |>
+  mutate(rate_per_100 = mentions / n_stories * 100) |>
+  left_join(ABORTION_PHRASES, by = "column") |>
+  filter(!is.na(display)) |>
+  mutate(category = factor(category, levels = names(ABORTION_CAT_COLORS)))
+
+phrase_order6 <- ABORTION_PHRASES |>
+  mutate(category = factor(category, levels = names(ABORTION_CAT_COLORS))) |>
+  arrange(category, display) |>
+  pull(display)
+bubble6$display <- factor(bubble6$display, levels = rev(phrase_order6))
+
+p6 <- ggplot(bubble6,
+             aes(x = panel, y = display,
+                 size = rate_per_100, color = category)) +
+
+  geom_point(alpha = 0.75) +
+
+  scale_size_area(max_size = 18, name = "Mentions per\n100 stories",
+                  breaks = c(5, 20, 50, 100, 200)) +
+  scale_color_manual(values = ABORTION_CAT_COLORS, name = "Category") +
+
+  labs(
+    title    = "Abortion-Related Language in Newspapers, 2021",
+    subtitle = "All papers combined and individually · Bubble size = mentions per 100 stories · Stories with 3+ core abortion mentions",
+    x        = NULL,
+    y        = NULL,
+    caption  = "Sources: Factiva RTF exports (NYT, Wall Street Journal, Guardian)"
+  ) +
+
+  theme_minimal(base_size = 11) +
+  theme(
+    plot.title       = element_text(face = "bold", size = 13),
+    plot.subtitle    = element_text(size = 8, color = "gray40"),
+    axis.text.x      = element_text(size = 10, face = "bold"),
+    axis.text.y      = element_text(size = 9),
+    legend.position  = "right",
+    panel.grid.major = element_line(color = "gray90"),
+    panel.grid.minor = element_blank(),
+    plot.caption     = element_text(size = 7, color = "gray50")
+  ) +
+
+  guides(
+    size  = guide_legend(order = 1),
+    color = guide_legend(order = 2, override.aes = list(size = 4))
+  )
+
+ggsave("chart6_2021_newspapers_by_paper.png", p6,
+       width = 13, height = 10, dpi = 150)
+
+message("Saved: chart6_2021_newspapers_by_paper.png")
