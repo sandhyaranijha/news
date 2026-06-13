@@ -624,7 +624,82 @@ parse_story <- function(raw_block, file_network) {
       is_live_blog   = as.integer(
         str_detect(tolower(headline %||% ""), "as it happened|live updates|live blog|rolling coverage") |
         (media_type == "print" & str_count(body_text, "\\S+") > 3000)
-      )
+      ),
+
+      # --- Source / quote indicators (print-oriented) ---
+      # Strategy: look for attribution verbs ("said", "told", "according to") within
+      # 200 chars of role-specific keywords. Each flag = 1 if pattern found anywhere
+      # in the body; 0 otherwise. For TV transcripts these will fire but are less
+      # reliable (anchors paraphrase rather than quote).
+      src_affected_woman = as.integer(media_type == "print" & str_detect(body_lower,
+        paste0(
+          "(?:said|told|according to|interview|speaking|recalls?|describ|explain|shared|recounted?|testified)",
+          ".{0,200}",
+          "(?:patient|her abortion|had an abortion|sought an abortion|",
+          "couldn.t get|was denied|needing an abortion|seeking an abortion|",
+          "termination|ectopic|miscarriage|pregnancy complications?|",
+          "rape survivor|sexual assault survivor|incest survivor)"
+        )
+      )),
+
+      src_provider = as.integer(media_type == "print" & str_detect(body_lower,
+        paste0(
+          "(?:said|told|according to|interview|speaking)",
+          ".{0,200}",
+          "(?:ob.gyn|obstetrician|gynecologist|abortion provider|abortion doctor|",
+          "clinic director|clinic administrator|performs? abortion|",
+          "physician who|doctor who|midwife|nurse practitioner|reproductive medicine)"
+        )
+      )),
+
+      src_politician = as.integer(media_type == "print" & str_detect(body_lower,
+        paste0(
+          "(?:said|told|according to|statement|tweeted|posted|announced|declared)",
+          ".{0,200}",
+          "(?:senator|representative|congressman|congresswoman|governor|",
+          "legislator|lawmaker|attorney general|state rep|assembly member|",
+          "white house|president biden|president trump|vice president)"
+        )
+      )),
+
+      src_religious = as.integer(media_type == "print" & str_detect(body_lower,
+        paste0(
+          "(?:said|told|according to|statement|pastoral letter|homily|sermon)",
+          ".{0,200}",
+          "(?:bishop|archbishop|cardinal|pope|pastor|priest|reverend|minister|",
+          "rabbi|imam|evangelical leader|faith leader|conference of catholic bishops)"
+        )
+      )),
+
+      src_expert = as.integer(media_type == "print" & str_detect(body_lower,
+        paste0(
+          "(?:said|told|according to|study|research|findings?|analysis)",
+          ".{0,200}",
+          "(?:professor|researcher|bioethicist|legal scholar|public health|",
+          "epidemiologist|demographer|ob.gyn professor|medical school|",
+          "guttmacher|commonwealth fund|kaiser family|brookings|urban institute)"
+        )
+      )),
+
+      src_antiabortion_advocate = as.integer(media_type == "print" & str_detect(body_lower,
+        paste0(
+          "(?:said|told|according to|statement|argues?|contends?)",
+          ".{0,200}",
+          "(?:right to life|national right to life|march for life|",
+          "susan b. anthony|lila rose|live action|students for life|",
+          "pro.life advocate|anti.abortion advocate|anti.abortion activist)"
+        )
+      )),
+
+      src_prochoice_advocate = as.integer(media_type == "print" & str_detect(body_lower,
+        paste0(
+          "(?:said|told|according to|statement|argues?|contends?)",
+          ".{0,200}",
+          "(?:planned parenthood|naral|aclu|center for reproductive rights|",
+          "reproductive freedom|pro.choice advocate|abortion rights advocate|",
+          "abortion rights activist|if/when/how|reproaction)"
+        )
+      ))
     ),
     as.list(phrase_counts)
   ))

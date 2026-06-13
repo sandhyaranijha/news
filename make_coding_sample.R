@@ -1,0 +1,85 @@
+library(readr)
+library(dplyr)
+
+set.seed(20260613)   # reproducible sample
+
+d <- read_csv("news_stories.csv", show_col_types = FALSE) |>
+  filter(
+    media_type          == "print",
+    !is.na(story_date),
+    is_live_blog        == 0,
+    core_abortion_count >= 3,
+    !is.na(headline)
+  ) |>
+  mutate(
+    period = case_when(
+      story_date < as.Date("2022-06-24") ~ "pre_dobbs",
+      story_date < as.Date("2025-01-20") ~ "post_dobbs",
+      TRUE                               ~ "trump_ii"
+    )
+  )
+
+# Stratified sample: 10 stories per network × period cell (take fewer if cell is small)
+sample_n_safe <- function(df, n) {
+  if (nrow(df) <= n) return(df)
+  slice_sample(df, n = n)
+}
+
+sample_df <- d |>
+  group_by(network, period) |>
+  group_modify(~ sample_n_safe(.x, 10)) |>
+  ungroup()
+
+message(sprintf("Total stories in sample: %d", nrow(sample_df)))
+message("Breakdown:")
+print(count(sample_df, network, period))
+
+# Columns to keep: identifiers + automated variables + 300-word lede for context
+# Blank columns for manual coding
+output <- sample_df |>
+  mutate(
+    # Truncate lede to ~300 words for the coding sheet
+    lede_for_coding = sapply(story_lede, function(x) {
+      words <- strsplit(x %||% "", "\\s+")[[1]]
+      paste(words[1:min(300, length(words))], collapse = " ")
+    })
+  ) |>
+  select(
+    # Identifiers
+    story_id      = row_number(),
+    network, period, story_date, headline, section,
+    word_count,
+
+    # Automated flags (for validation)
+    is_opinion,
+    story_trigger,
+    src_affected_woman, src_provider, src_politician,
+    src_religious, src_expert,
+    src_antiabortion_advocate, src_prochoice_advocate,
+
+    # Key phrase counts
+    pro_life, pro_choice, abortion_rights, abortion_ban,
+    patient_impact, women_affected, medical_necessity,
+
+    # Lede text for coding context
+    lede_for_coding,
+
+    # --- BLANK MANUAL CODING COLUMNS ---
+    # Fill these in for each story
+    coded_affected_woman    = NA_integer_,  # 0/1: impacted patient actually interviewed/quoted
+    coded_provider          = NA_integer_,  # 0/1: abortion provider actually interviewed/quoted
+    coded_politician        = NA_integer_,  # 0/1: politician quoted
+    coded_expert            = NA_integer_,  # 0/1: researcher/medical expert quoted
+    coded_religious         = NA_integer_,  # 0/1: religious leader quoted
+    coded_anti_advocate     = NA_integer_,  # 0/1: anti-abortion advocate quoted
+    coded_pro_advocate      = NA_integer_,  # 0/1: pro-choice advocate quoted
+    coded_source_count      = NA_integer_,  # total distinct source types (0-7)
+    coded_balance           = NA_character_, # "pro_life_only" / "pro_choice_only" / "mixed" / "neutral"
+    coded_primary_frame     = NA_character_, # "policy" / "patient_story" / "political_conflict" / "medical" / "legal" / "other"
+    coded_is_opinion        = NA_integer_,  # 0/1: is this actually an opinion piece?
+    coded_notes             = NA_character_  # free text notes
+  )
+
+write_csv(output, "manual_coding_sample.csv", na = "")
+message(sprintf("Saved: manual_coding_sample.csv (%d rows, %d columns)",
+                nrow(output), ncol(output)))
