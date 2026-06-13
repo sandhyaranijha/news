@@ -40,44 +40,36 @@ output <- sample_df |>
   mutate(
     # Truncate lede to ~300 words for the coding sheet
     lede_for_coding = sapply(story_lede, function(x) {
-      words <- strsplit(x %||% "", "\\s+")[[1]]
+      words <- strsplit(if (is.na(x)) "" else x, "\\s+")[[1]]
       paste(words[1:min(300, length(words))], collapse = " ")
     })
   ) |>
+  mutate(
+    story_id = row_number(),
+    # blank columns for manual coding
+    coded_affected_woman  = NA_integer_,
+    coded_provider        = NA_integer_,
+    coded_politician      = NA_integer_,
+    coded_expert          = NA_integer_,
+    coded_religious       = NA_integer_,
+    coded_anti_advocate   = NA_integer_,
+    coded_pro_advocate    = NA_integer_,
+    coded_source_count    = NA_integer_,
+    coded_balance         = NA_character_,
+    coded_primary_frame   = NA_character_,
+    coded_is_opinion      = NA_integer_,
+    coded_notes           = NA_character_
+  ) |>
   select(
-    # Identifiers
-    story_id      = row_number(),
-    network, period, story_date, headline, section,
-    word_count,
-
-    # Automated flags (for validation)
-    is_opinion,
-    story_trigger,
+    story_id, network, period, story_date, headline, section, word_count,
+    is_opinion, story_trigger,
     src_affected_woman, src_provider, src_politician,
     src_religious, src_expert,
     src_antiabortion_advocate, src_prochoice_advocate,
-
-    # Key phrase counts
     pro_life, pro_choice, abortion_rights, abortion_ban,
     patient_impact, women_affected, medical_necessity,
-
-    # Lede text for coding context
     lede_for_coding,
-
-    # --- BLANK MANUAL CODING COLUMNS ---
-    # Fill these in for each story
-    coded_affected_woman    = NA_integer_,  # 0/1: impacted patient actually interviewed/quoted
-    coded_provider          = NA_integer_,  # 0/1: abortion provider actually interviewed/quoted
-    coded_politician        = NA_integer_,  # 0/1: politician quoted
-    coded_expert            = NA_integer_,  # 0/1: researcher/medical expert quoted
-    coded_religious         = NA_integer_,  # 0/1: religious leader quoted
-    coded_anti_advocate     = NA_integer_,  # 0/1: anti-abortion advocate quoted
-    coded_pro_advocate      = NA_integer_,  # 0/1: pro-choice advocate quoted
-    coded_source_count      = NA_integer_,  # total distinct source types (0-7)
-    coded_balance           = NA_character_, # "pro_life_only" / "pro_choice_only" / "mixed" / "neutral"
-    coded_primary_frame     = NA_character_, # "policy" / "patient_story" / "political_conflict" / "medical" / "legal" / "other"
-    coded_is_opinion        = NA_integer_,  # 0/1: is this actually an opinion piece?
-    coded_notes             = NA_character_  # free text notes
+    starts_with("coded_")
   )
 
 write_csv(output, "manual_coding_sample.csv", na = "")
