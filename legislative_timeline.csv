@@ -1,0 +1,74 @@
+date,state,level,event_type,description,outcome,source
+2021-02-18,South Carolina,state,legislation,Gov. McMaster signs fetal heartbeat ban (exceptions for rape/incest to 20 wks),Signed — immediately blocked by federal injunction (Feb 19),Ballotpedia
+2021-03-10,Arkansas,state,legislation,Gov. Hutchinson signs SB 6 — near-total abortion ban (life of mother only),Signed — blocked by federal preliminary injunction (Jul 20 2021),Ballotpedia
+2021-04-26,Montana,state,legislation,Gov. Gianforte signs HB 136 — ban after 20 weeks,Signed — blocked by preliminary injunction (Oct 7 2021),Ballotpedia
+2021-04-26,Oklahoma,state,legislation,Gov. Stitt signs HB 1102 and HB 2441 (heartbeat ban + provider license suspension),Signed — both enjoined by Oklahoma County District Court (Oct 2021),Ballotpedia
+2021-05-19,Texas,state,legislation,Gov. Abbott signs SB 8 — fetal heartbeat ban with private civil enforcement mechanism,Signed — took effect Sep 1 2021; blocked Oct 6 then reinstated Oct 8; Supreme Court declined to block in Dec 2021,Ballotpedia
+2021-06-09,Missouri,state,legislation,8th Circuit blocks HB 126 — ban after 8 weeks (also banned race/sex/Down syndrome abortions),Blocked by 8th Circuit panel,Ballotpedia
+2021-09-01,Texas,state,legislation,SB 8 takes effect — first fetal heartbeat law to remain in effect under Roe,In effect,Ballotpedia
+2022-06-24,Federal,federal,scotus,Dobbs v. Jackson Women's Health Organization — Supreme Court overturns Roe v. Wade and Planned Parenthood v. Casey,Decided — returns abortion regulation to states,Ballotpedia
+2022-08-25,Tennessee,state,legislation,SB 1257 (passed 2019 as trigger law) takes effect — near-total ban; performing abortion a Class C felony,In effect,Ballotpedia
+2022-08-25,Idaho,state,legislation,S1385 (2020 trigger law) takes effect — ban with exceptions for life/rape/incest,In effect — medical emergency provision blocked Aug 24 by federal injunction,Ballotpedia
+2022-09-14,Ohio,state,litigation,Hamilton County judge grants 14-day restraining order against SB 23 (6-week ban),Blocked temporarily,Ballotpedia
+2022-09-16,West Virginia,state,legislation,Gov. Justice signs HB 302 — near-total ban with exceptions for rape/incest (if reported),Enacted,Ballotpedia
+2022-09-23,Arizona,state,litigation,Judge rules 1864 near-total abortion ban enforceable following Dobbs,Ruling issued — supersedes 2022 15-week ban,Ballotpedia
+2022-09-24,Arizona,state,legislation,SB 1164 (15-week ban) takes effect,In effect briefly — superseded by 1864 law ruling same day,Ballotpedia
+2022-09-27,Ohio,state,litigation,Hamilton County judge extends restraining order against SB 23 to Oct 12,Blocked,Ballotpedia
+2022-10-07,Arizona,state,litigation,Arizona Court of Appeals blocks enforcement of 1864 statute — abortions up to viability legal again,1864 ban blocked; 15-week ban in effect,Ballotpedia
+2022-11-08,California,state,ballot,Proposition 1 — constitutional right to abortion and contraception,PASSED 66.9%,Ballotpedia
+2022-11-08,Kentucky,state,ballot,Constitutional Amendment 2 — no constitutional right to abortion,FAILED 52.4% to 47.6%,Ballotpedia
+2022-11-08,Michigan,state,ballot,Proposal 3 — constitutional right to reproductive freedom,PASSED,Ballotpedia
+2022-11-08,Montana,state,ballot,LR-131 — require medical care for born-alive infants,FAILED 52.6% to 47.5%,Ballotpedia
+2022-11-08,Vermont,state,ballot,Proposal 5 — constitutional right to personal reproductive autonomy,PASSED,Ballotpedia
+2022-11-15,Georgia,state,litigation,Fulton County judge suspends HB 481 (6-week ban),Blocked,Ballotpedia
+2022-11-23,Georgia,state,litigation,Georgia Supreme Court reinstates HB 481 (6-week ban),In effect,Ballotpedia
+2023-01-06,South Carolina,state,litigation,SC Supreme Court rules 6-week heartbeat ban unconstitutional (privacy clause),Struck down,Ballotpedia
+2023-01-31,Minnesota,state,legislation,Gov. Walz signs HF 1 — enshrines fundamental right to abortion and reproductive healthcare,Enacted,Ballotpedia
+2023-03-16,North Dakota,state,litigation,ND Supreme Court upholds injunction blocking near-total abortion ban HB 1466,Blocked,Ballotpedia
+2023-04-13,Florida,state,legislation,Gov. DeSantis signs SB 300 — 6-week ban (contingent on court upholding 15-week ban),Signed — not yet in effect,Ballotpedia
+2023-04-24,North Dakota,state,legislation,Gov. Burgum signs SB 2150 — near-total ban (exceptions for rape/incest to 6 wks; life of mother throughout),Enacted,Ballotpedia
+2023-05-16,North Carolina,state,legislation,SB 20 — 12-week ban (exceptions for rape/incest to 20 wks) enacted via veto override,Enacted (took effect Jul 1 2023),Ballotpedia
+2023-05-22,Nebraska,state,legislation,Gov. Pillen signs bill limiting abortion after 12 weeks,Enacted,Ballotpedia
+2023-05-25,South Carolina,state,legislation,Gov. McMaster signs SB 474 — fetal heartbeat ban (exceptions for rape/incest to 12 wks),Signed — immediately blocked by circuit court,Ballotpedia
+2023-05-26,South Carolina,state,litigation,Circuit court temporarily blocks SB 474,Blocked pending SC Supreme Court review,Ballotpedia
+2023-06-15,Iowa,state,litigation,Iowa Supreme Court 3-3 — declines to uphold block on 6-week ban (HF 732),Block lifted — case continues,Ballotpedia
+2023-08-21,Indiana,state,litigation,Indiana Supreme Court 4-1 upholds SB 1 — near-total ban takes effect,In effect,Ballotpedia
+2023-09-30,North Carolina,state,litigation,Federal judge blocks hospital-only provision and documentation requirement in 12-week ban,Partially blocked,Ballotpedia
+2023-10-30,Kansas,state,litigation,Judge pauses waiting-period law,Blocked,Ballotpedia
+2023-11-09,Idaho,state,litigation,Federal magistrate temporarily blocks HB 242 — minors crossing state lines for abortion,Blocked,Ballotpedia
+2024-01-05,Idaho,state,scotus,U.S. Supreme Court allows Idaho near-total ban to take effect while hearing Moyle v. US,In effect pending SCOTUS ruling,Ballotpedia
+2024-04-01,Florida,state,litigation,Florida Supreme Court upholds 15-week ban — allows 6-week ban (SB 300) to take effect May 1,15-week ban upheld; 6-week ban triggered,Ballotpedia
+2024-04-09,Arizona,state,litigation,Arizona Supreme Court 4-2 upholds 1864 near-total abortion ban,Enforceable — stayed 14 days,Ballotpedia
+2024-05-01,Florida,state,legislation,SB 300 (6-week ban) takes effect,In effect,Ballotpedia
+2024-05-02,Arizona,state,legislation,Gov. Hobbs signs HB 2677 repealing 1864 abortion ban,Enacted — took effect ~Sep 2024,Ballotpedia
+2024-05-13,Arizona,state,litigation,Arizona Supreme Court delays enforcement of 1864 ban to Sep 26,Delayed,Ballotpedia
+2024-06-27,Idaho,federal,scotus,"Moyle v. United States — SCOTUS 6-3 reinstates injunction blocking Idaho from enforcing emergency abortion ban; emergency abortions allowed while litigation continues",Injunction reinstated,Ballotpedia
+2024-06-28,Iowa,state,litigation,Iowa Supreme Court 4-3 rules 6-week ban (HF 732) can take effect,In effect late July 2024,Ballotpedia
+2024-09-12,North Dakota,state,litigation,District judge rules 2023 6-week ban unconstitutional — fundamental right to abortion before viability,Blocked,Ballotpedia
+2024-11-05,Arizona,state,ballot,Proposition 139 — constitutional right to abortion,PASSED,Ballotpedia
+2024-11-05,Colorado,state,ballot,Amendment 79 — constitutional right to abortion + public funding,PASSED,Ballotpedia
+2024-11-05,Florida,state,ballot,Amendment 4 — constitutional right to abortion (required 60% threshold),FAILED (did not reach 60%),Ballotpedia
+2024-11-05,Maryland,state,ballot,Question 1 — constitutional right to reproductive freedom,PASSED,Ballotpedia
+2024-11-05,Missouri,state,ballot,Amendment 3 — constitutional right to abortion (first in a 6-week ban state),PASSED,Ballotpedia
+2024-11-05,Montana,state,ballot,Right to Abortion Initiative — explicit constitutional right,PASSED,Ballotpedia
+2024-11-05,Nebraska,state,ballot,Initiative 434 — prohibit abortion after first trimester,PASSED,Ballotpedia
+2024-11-05,Nebraska,state,ballot,Initiative 439 — constitutional right to abortion,FAILED,Ballotpedia
+2024-11-05,Nevada,state,ballot,Question 6 — constitutional right to abortion,PASSED,Ballotpedia
+2024-11-05,New York,state,ballot,Proposal 1 — equal protection amendment (includes pregnancy outcomes and reproductive autonomy),PASSED,Ballotpedia
+2024-11-05,South Dakota,state,ballot,Constitutional Amendment G — right to abortion using trimester framework,FAILED,Ballotpedia
+2024-11-21,North Dakota,state,litigation,ND Supreme Court upholds SB 2150 (near-total ban) — 2-of-5 found constitutional (needed 4 to overturn),Upheld — in effect,Ballotpedia
+2025-03-05,Arizona,state,litigation,Maricopa County judge rules 15-week ban (enacted 2022) unconstitutional,Struck down,Ballotpedia
+2026-01-06,Wyoming,state,litigation,Wyoming Supreme Court 4-1 strikes down HB 152 and SF 109 (2023 restrictions + abortion pill ban) as violating state constitution,Struck down,Ballotpedia
+2026-03-09,Wyoming,state,legislation,Gov. Gordon signs HB 126 — Human Heartbeat Act (6-week ban),Signed — challenged same day,Ballotpedia
+2026-03-10,Wyoming,state,litigation,Lawsuit filed challenging HB 126 constitutionality,Pending,Ballotpedia
+2026-04-20,Pennsylvania,state,litigation,PA Commonwealth Court 4-3 — abortion funding ban unconstitutional (sex discrimination),Struck down — appealed May 19 to PA Supreme Court,Ballotpedia
+2025-01-20,Federal,federal,executive,Trump reinstates Mexico City Policy (Global Gag Rule) — bars U.S. funding to foreign NGOs that provide or promote abortion,Enacted,Federal Register (Presidential Memorandum Jan 20 2025); ACLU Trump on Abortion tracker
+2025-01-24,Federal,federal,executive,Trump signs EO 14182 — Enforcing the Hyde Amendment; revokes Biden EOs 14076 and 14079 that had expanded reproductive healthcare access post-Dobbs,Enacted,White House presidential-actions/2025/01/enforcing-the-hyde-amendment; ACLU Trump on Abortion tracker
+2025-01-29,Federal,federal,executive,Pentagon (DoD) rescinds travel reimbursement policy for service members and dependents seeking abortion care; inadvertently also removes fertility treatment coverage,Enacted — fertility provision partially reversed Feb 2025,Stars and Stripes Jan 31 2025 (stripes.com/theaters/us/2025-01-31/defense-department-travel-policy-abortions-16672597.html); ACLU Trump on Abortion tracker
+2025-03-01,Federal,federal,executive,DOJ drops United States v. Idaho — Biden-era EMTALA lawsuit requiring emergency abortion access in states with abortion bans,Dismissed,ACLU Trump on Abortion tracker
+2025-03-31,Federal,federal,executive,Trump administration freezes Title X family planning funding to 16 grantees including all 9 Planned Parenthood affiliates — affects 879 clinics in 23 states,Enacted,ACLU Trump on Abortion tracker; KFF Title X Grantees tracker
+2025-05-01,Federal,federal,executive,HHS Secretary RFK Jr. announces FDA review of mifepristone safety regulations — could restrict mail-order access or require in-person prescriptions,Under review,ACLU Trump on Abortion tracker
+2025-06-03,Federal,federal,executive,Trump administration rescinds Biden-era EMTALA guidance requiring hospitals to provide emergency abortions in states with bans; CMS says will still enforce EMTALA broadly,Enacted,ACLU Trump on Abortion tracker
+2026-05-01,Federal,federal,litigation,5th Circuit rules mifepristone must be dispensed in-person only — blocks FDA telehealth/mail prescribing rules,Blocked mail access — immediately challenged,NPR May 1 2026; CNN May 1 2026
+2026-05-04,Federal,federal,scotus,Justice Alito issues emergency 1-week stay of 5th Circuit mifepristone ruling,Mail access temporarily preserved,NPR May 4 2026; CNN May 4 2026
+2026-05-14,Federal,federal,scotus,Supreme Court rules mifepristone can continue to be prescribed via telehealth and mailed — stays 5th Circuit ruling while Louisiana v. FDA proceeds,Mail/telehealth access preserved pending litigation,NPR May 14 2026; CNN May 14 2026
