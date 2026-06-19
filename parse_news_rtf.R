@@ -554,30 +554,52 @@ parse_story <- function(raw_block, file_network) {
     str_detect(tolower(body_text), US_STATES)
   )
 
-  # --- Abortion segment lede: 200 words starting where abortion is first mentioned ---
-  # These are whole broadcast transcripts; the abortion segment can appear anywhere.
-  # Find the first abortion-related word, then take 200 words from that point.
+  # --- Isolate the abortion segment within TV documents ---
+  # Many TV "documents" are full broadcast rundowns (multiple unrelated stories
+  # stitched into one Factiva record, sometimes 10,000+ words). Counting phrases
+  # over the whole rundown would pick up unrelated segments (weather, foreign
+  # policy, etc.), so for TV we find the densest cluster of abortion-anchor hits
+  # and treat that cluster (with padding) as the actual abortion story, scoping
+  # word_count/phrase counts/story_text to just that window.
+  # Print stories are NOT truncated here — each print record is already a single
+  # article (filtered upstream by the "abortion" >=5-mentions retrieval rule), so
+  # the full body is the actual story, and src_* detection depends on full text.
   ABORTION_ANCHORS <- c("abortion", "roe", "dobbs", "mifepristone",
                          "reproductive rights", "pro-life", "pro-choice")
   body_words  <- str_split(body_text, "\\s+")[[1]]
   body_lower_words <- tolower(body_words)
-  seg_start <- NA_integer_
-  for (anchor in ABORTION_ANCHORS) {
-    hits <- which(str_detect(body_lower_words, fixed(anchor)))
-    if (length(hits) > 0) {
-      seg_start <- max(1, hits[1] - 20)  # 20 words of run-up for context
-      break
+
+  if (media_type == "tv") {
+    anchor_hits <- sort(unique(unlist(lapply(ABORTION_ANCHORS, function(a) {
+      which(str_detect(body_lower_words, fixed(a)))
+    }))))
+
+    GAP_THRESHOLD <- 80   # word-distance gap that splits hits into separate clusters
+    PAD_BEFORE <- 30
+    PAD_AFTER  <- 150
+
+    if (length(anchor_hits) > 0) {
+      gaps <- c(0, diff(anchor_hits))
+      cluster_id <- cumsum(gaps > GAP_THRESHOLD)
+      cluster_sizes <- table(cluster_id)
+      best_cluster <- as.integer(names(cluster_sizes)[which.max(cluster_sizes)])
+      cluster_positions <- anchor_hits[cluster_id == best_cluster]
+
+      seg_start <- max(1, min(cluster_positions) - PAD_BEFORE)
+      seg_end   <- min(length(body_words), max(cluster_positions) + PAD_AFTER)
+
+      body_text  <- paste(body_words[seg_start:seg_end], collapse = " ")
+      story_lede <- paste(body_words[seg_start:min(seg_end, seg_start + 199)], collapse = " ")
+    } else {
+      body_text  <- paste(head(body_words, 400), collapse = " ")
+      story_lede <- paste(head(body_words, 200), collapse = " ")
     }
-  }
-  if (!is.na(seg_start)) {
-    story_lede <- paste(body_words[seg_start:min(length(body_words), seg_start + 199)],
-                        collapse = " ")
   } else {
     story_lede <- paste(head(body_words, 200), collapse = " ")
   }
   lede_lower <- tolower(story_lede)
 
-  # --- Phrase counts (full story text) ---
+  # --- Phrase counts (TV: isolated segment; print: full story text) ---
   body_lower <- tolower(body_text)
 
   # --- Trigger classification ---
@@ -768,8 +790,10 @@ process_rtf_file <- function(filepath) {
 # MAIN
 # ---------------------------------------------------------------------------
 
-# Find all RTF files
-rtf_files <- list.files(RTF_DIR, pattern = "\\.rtf$", full.names = TRUE, ignore.case = TRUE)
+# Find all RTF files (excluding the separate labor corpus, which shares this
+# directory but is parsed by parse_news_rtf_labor.R)
+all_rtf_files <- list.files(RTF_DIR, pattern = "\\.rtf$", full.names = TRUE, ignore.case = TRUE)
+rtf_files <- all_rtf_files[!str_detect(tolower(basename(all_rtf_files)), "labor")]
 
 if (length(rtf_files) == 0) {
   stop("No RTF files found in: ", RTF_DIR,
