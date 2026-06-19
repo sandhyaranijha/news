@@ -340,28 +340,48 @@ parse_story <- function(raw_block, file_network) {
     media_type == "tv" | str_detect(factiva_region, "Domestic")
   )
 
-  # --- Labor segment lede: 200 words starting where labor is first mentioned ---
+  # --- Isolate the labor segment within the document ---
+  # Many TV "documents" are full broadcast rundowns (multiple unrelated stories
+  # stitched into one Factiva record, sometimes 10,000+ words). Counting phrases
+  # over the whole rundown would pick up unrelated segments (Iran strikes,
+  # weather, etc.), so we find the densest cluster of labor-anchor hits and
+  # treat that cluster (with padding) as the actual labor story, discarding
+  # the rest of the rundown from word_count/phrase counts/story_text.
   LABOR_ANCHORS <- c("union", "strike", "labor", "nlrb", "collective bargaining",
                      "worker", "workers", "picket")
   body_words  <- str_split(body_text, "\\s+")[[1]]
   body_lower_words <- tolower(body_words)
-  seg_start <- NA_integer_
-  for (anchor in LABOR_ANCHORS) {
-    hits <- which(str_detect(body_lower_words, fixed(anchor)))
-    if (length(hits) > 0) {
-      seg_start <- max(1, hits[1] - 20)
-      break
-    }
-  }
-  if (!is.na(seg_start)) {
-    story_lede <- paste(body_words[seg_start:min(length(body_words), seg_start + 199)],
-                        collapse = " ")
+
+  anchor_hits <- sort(unique(unlist(lapply(LABOR_ANCHORS, function(a) {
+    which(str_detect(body_lower_words, fixed(a)))
+  }))))
+
+  GAP_THRESHOLD <- 80   # word-distance gap that splits hits into separate clusters
+  PAD_BEFORE <- 30
+  PAD_AFTER  <- 150
+
+  if (length(anchor_hits) > 0) {
+    gaps <- c(0, diff(anchor_hits))
+    cluster_id <- cumsum(gaps > GAP_THRESHOLD)
+    cluster_sizes <- table(cluster_id)
+    best_cluster <- as.integer(names(cluster_sizes)[which.max(cluster_sizes)])
+    cluster_positions <- anchor_hits[cluster_id == best_cluster]
+
+    seg_start <- max(1, min(cluster_positions) - PAD_BEFORE)
+    seg_end   <- min(length(body_words), max(cluster_positions) + PAD_AFTER)
+
+    labor_text  <- paste(body_words[seg_start:seg_end], collapse = " ")
+    story_lede  <- paste(body_words[seg_start:min(seg_end, seg_start + 199)], collapse = " ")
   } else {
+    # No anchor matched (shouldn't normally happen since file was retrieved
+    # under the labor subject tag) — fall back to first 400 words.
+    labor_text <- paste(head(body_words, 400), collapse = " ")
     story_lede <- paste(head(body_words, 200), collapse = " ")
   }
-  lede_lower <- tolower(story_lede)
 
-  body_lower <- tolower(body_text)
+  lede_lower  <- tolower(story_lede)
+  body_lower  <- tolower(labor_text)
+  body_text   <- labor_text   # downstream word_count/story_text use the isolated segment
 
   story_trigger <- classify_trigger(lede_lower)
   if (story_trigger == "other") {
