@@ -348,30 +348,37 @@ parse_story <- function(raw_block, file_network) {
   body_words  <- str_split(body_text, "\\s+")[[1]]
   body_lower_words <- tolower(body_words)
 
-  anchor_hits <- sort(unique(unlist(lapply(LABOR_ANCHORS, function(a) {
-    which(str_detect(body_lower_words, fixed(a)))
-  }))))
+  if (media_type == "tv") {
+    anchor_hits <- sort(unique(unlist(lapply(LABOR_ANCHORS, function(a) {
+      which(str_detect(body_lower_words, fixed(a)))
+    }))))
 
-  GAP_THRESHOLD <- 80   # word-distance gap that splits hits into separate clusters
-  PAD_BEFORE <- 30
-  PAD_AFTER  <- 150
+    GAP_THRESHOLD <- 80   # word-distance gap that splits hits into separate clusters
+    PAD_BEFORE <- 30
+    PAD_AFTER  <- 150
 
-  if (length(anchor_hits) > 0) {
-    gaps <- c(0, diff(anchor_hits))
-    cluster_id <- cumsum(gaps > GAP_THRESHOLD)
-    cluster_sizes <- table(cluster_id)
-    best_cluster <- as.integer(names(cluster_sizes)[which.max(cluster_sizes)])
-    cluster_positions <- anchor_hits[cluster_id == best_cluster]
+    if (length(anchor_hits) > 0) {
+      gaps <- c(0, diff(anchor_hits))
+      cluster_id <- cumsum(gaps > GAP_THRESHOLD)
+      cluster_sizes <- table(cluster_id)
+      best_cluster <- as.integer(names(cluster_sizes)[which.max(cluster_sizes)])
+      cluster_positions <- anchor_hits[cluster_id == best_cluster]
 
-    seg_start <- max(1, min(cluster_positions) - PAD_BEFORE)
-    seg_end   <- min(length(body_words), max(cluster_positions) + PAD_AFTER)
+      seg_start <- max(1, min(cluster_positions) - PAD_BEFORE)
+      seg_end   <- min(length(body_words), max(cluster_positions) + PAD_AFTER)
 
-    labor_text  <- paste(body_words[seg_start:seg_end], collapse = " ")
-    story_lede  <- paste(body_words[seg_start:min(seg_end, seg_start + 199)], collapse = " ")
+      labor_text  <- paste(body_words[seg_start:seg_end], collapse = " ")
+      story_lede  <- paste(body_words[seg_start:min(seg_end, seg_start + 199)], collapse = " ")
+    } else {
+      # No anchor matched (shouldn't normally happen since file was retrieved
+      # under the labor subject tag) — fall back to first 400 words.
+      labor_text <- paste(head(body_words, 400), collapse = " ")
+      story_lede <- paste(head(body_words, 200), collapse = " ")
+    }
   } else {
-    # No anchor matched (shouldn't normally happen since file was retrieved
-    # under the labor subject tag) — fall back to first 400 words.
-    labor_text <- paste(head(body_words, 400), collapse = " ")
+    # Print articles are already single, scoped Factiva records — keep the
+    # full article text and only window the lede for trigger classification.
+    labor_text <- body_text
     story_lede <- paste(head(body_words, 200), collapse = " ")
   }
 
