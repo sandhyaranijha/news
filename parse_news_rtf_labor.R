@@ -482,7 +482,57 @@ parse_story <- function(raw_block, file_network) {
       is_live_blog   = as.integer(
         str_detect(tolower(headline %||% ""), "as it happened|live updates|live blog|rolling coverage") |
         (media_type == "print" & str_count(body_text, "\\S+") > 3000)
-      )
+      ),
+
+      # --- Source / quote indicators ---
+      # Same attribution-verb-near-role-keyword strategy as the abortion parser.
+      # Runs on both print and TV (isolated segment); TV hits are less reliable
+      # since anchors paraphrase rather than directly quote.
+      src_worker = as.integer(str_detect(body_lower,
+        paste0(
+          "(?:said|told|according to|interview|speaking|recalls?|describ|explain|shared|recounted?|testified)",
+          ".{0,200}",
+          "(?:striking worker|union member|rank.and.file|picket(?:er|ing)?|",
+          "employee who|worker who|on the picket line|walked off the job)"
+        )
+      )),
+
+      src_union_official = as.integer(str_detect(body_lower,
+        paste0(
+          "(?:said|told|according to|statement|announced|declared)",
+          ".{0,200}",
+          "(?:union president|union official|union leader|union spokesperson|",
+          "local president|business agent|shop steward|union organizer|",
+          "afl.cio|seiu|teamsters|uaw|united auto workers)"
+        )
+      )),
+
+      src_company = as.integer(str_detect(body_lower,
+        paste0(
+          "(?:said|told|according to|statement|spokesperson|spokesman|spokeswoman)",
+          ".{0,200}",
+          "(?:company spokesperson|company official|management|ceo|chief executive|",
+          "employer|the company said|in a statement)"
+        )
+      )),
+
+      src_official = as.integer(str_detect(body_lower,
+        paste0(
+          "(?:said|told|according to|statement|ruled|announced)",
+          ".{0,200}",
+          "(?:nlrb|national labor relations board|labor department|department of labor|",
+          "regional director|administrative law judge|government official)"
+        )
+      )),
+
+      src_expert = as.integer(str_detect(body_lower,
+        paste0(
+          "(?:said|told|according to|study|research|findings?|analysis)",
+          ".{0,200}",
+          "(?:professor|labor economist|researcher|analyst|labor historian|",
+          "economic policy institute|bureau of labor statistics|think tank)"
+        )
+      ))
     ),
     as.list(phrase_counts)
   ))
