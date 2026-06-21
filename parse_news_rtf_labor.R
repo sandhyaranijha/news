@@ -406,7 +406,20 @@ parse_story <- function(raw_block, file_network) {
   ))
   us_hits      <- sum(sapply(US_SIGNALS, function(t) str_count(body_lower, fixed(t))))
   foreign_hits <- sum(sapply(FOREIGN_SIGNALS, function(t) str_count(body_lower, fixed(t))))
-  is_us_story <- as.integer(!(foreign_hits > 0 & foreign_hits >= us_hits))
+
+  # Headline-level check: a foreign country/city named in the headline itself
+  # (with no US signal there) is a much stronger "this story IS the foreign
+  # event" signal than scattered foreign mentions used as an aside/comparison
+  # in an otherwise US-focused segment (e.g. "...creating energy...China and
+  # India..." inside a US energy-policy debate).
+  headline_lower <- tolower(headline %||% "")
+  headline_foreign <- any(sapply(FOREIGN_SIGNALS, function(t) str_detect(headline_lower, fixed(t))))
+  headline_us      <- any(sapply(US_SIGNALS, function(t) str_detect(headline_lower, fixed(t))))
+
+  is_us_story <- as.integer(!(
+    (headline_foreign & !headline_us) |
+    (foreign_hits >= 4 & (foreign_hits - us_hits) >= 3)
+  ))
 
   # --- Union-relevance gate ---
   # Generic "employment"/"workers" language (e.g. an arts story about a show's

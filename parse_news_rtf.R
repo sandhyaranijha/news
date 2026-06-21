@@ -619,7 +619,18 @@ parse_story <- function(raw_block, file_network) {
   ))
   us_hits      <- sum(sapply(strsplit(US_STATES, "\\|")[[1]], function(t) str_count(body_lower, fixed(t))))
   foreign_hits <- sum(sapply(FOREIGN_SIGNALS, function(t) str_count(body_lower, fixed(t))))
-  is_us_story <- as.integer(!(foreign_hits > 0 & foreign_hits >= us_hits))
+
+  # Headline-level check: a foreign country/city named in the headline itself
+  # (with no US signal there) is a much stronger "this story IS the foreign
+  # event" signal than scattered foreign mentions used as an aside/comparison.
+  headline_lower <- tolower(headline %||% "")
+  headline_foreign <- any(sapply(FOREIGN_SIGNALS, function(t) str_detect(headline_lower, fixed(t))))
+  headline_us      <- str_detect(headline_lower, US_STATES)
+
+  is_us_story <- as.integer(!(
+    (headline_foreign & !headline_us) |
+    (foreign_hits >= 4 & (foreign_hits - us_hits) >= 3)
+  ))
 
   # --- Trigger classification ---
   # Primary: use the abortion segment lede (200 words) — captures what prompted
