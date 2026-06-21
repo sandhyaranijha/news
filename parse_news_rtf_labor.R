@@ -431,7 +431,11 @@ parse_story <- function(raw_block, file_network) {
     "collective bargaining", "picket", "strike", "afl-cio", "seiu", "teamsters",
     "uaw", "united auto workers", "afscme", "shop steward", "union rep",
     "union representative", "organizing committee", "starbucks workers united",
-    "amazon labor union", "labor organizer", "card check", "decertification"
+    "amazon labor union", "labor organizer", "card check", "decertification",
+    "trader joe's united", "cwa", "communications workers of america",
+    "alpa", "air line pilots association", "strike authorization",
+    "walkout", "unfair labor practice", "union-busting", "union busting",
+    "anti-union", "labor dispute"
   )
   is_union_relevant <- as.integer(
     any(sapply(UNION_RELEVANCE_ANCHORS, function(t) str_detect(body_lower, fixed(t))))
