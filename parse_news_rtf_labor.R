@@ -336,10 +336,6 @@ parse_story <- function(raw_block, file_network) {
     str_detect(tolower(headline %||% ""), "opinion|editorial|op-ed|commentary")
   )
 
-  is_us_story <- as.integer(
-    media_type == "tv" | str_detect(factiva_region, "Domestic")
-  )
-
   # --- Isolate the labor segment within the document ---
   # Many TV "documents" are full broadcast rundowns (multiple unrelated stories
   # stitched into one Factiva record, sometimes 10,000+ words). Counting phrases
@@ -383,6 +379,51 @@ parse_story <- function(raw_block, file_network) {
   body_lower  <- tolower(labor_text)
   body_text   <- labor_text   # downstream word_count/story_text use the isolated segment
 
+  # --- Real US-only filter ---
+  # Factiva's own "US only" search filter still lets through stories that are
+  # primarily about a foreign event (e.g. Guardian pieces with an Australia
+  # dateline, an Air Canada strike segment). Rather than trusting Factiva's
+  # region tag, scan the isolated labor segment itself for US vs. foreign
+  # signal density. State/local US stories are kept (state names count as a
+  # US signal); stories whose only country signal is foreign are dropped.
+  US_SIGNALS <- tolower(c(
+    state.name, "united states", "u.s.", "america", "american", "washington",
+    "white house", "congress", "federal government", "nlrb", "osha",
+    "department of labor", "capitol hill"
+  ))
+  FOREIGN_SIGNALS <- tolower(c(
+    "canada", "canadian", "air canada", "france", "french", "germany", "german",
+    "australia", "australian", "united kingdom", "britain", "british", "england",
+    "china", "chinese", "japan", "japanese", "mexico", "mexican", "india", "indian",
+    "brazil", "brazilian", "italy", "italian", "spain", "spanish", "russia", "russian",
+    "ukraine", "ukrainian", "israel", "israeli", "palestine", "palestinian",
+    "south korea", "korean", "ireland", "irish", "scotland", "wales", "netherlands",
+    "belgium", "switzerland", "sweden", "norway", "denmark", "poland", "portugal",
+    "greece", "turkey", "egypt", "south africa", "nigeria", "argentina", "chile",
+    "colombia", "venezuela", "philippines", "indonesia", "vietnam", "thailand",
+    "new zealand", "munich", "berlin", "paris", "london", "tokyo", "beijing",
+    "toronto", "ottawa", "sydney", "melbourne"
+  ))
+  us_hits      <- sum(sapply(US_SIGNALS, function(t) str_count(body_lower, fixed(t))))
+  foreign_hits <- sum(sapply(FOREIGN_SIGNALS, function(t) str_count(body_lower, fixed(t))))
+  is_us_story <- as.integer(!(foreign_hits > 0 & foreign_hits >= us_hits))
+
+  # --- Union-relevance gate ---
+  # Generic "employment"/"workers" language (e.g. an arts story about a show's
+  # dystopian-workplace premise) can land in the labor anchor cluster without
+  # the story actually being about organizing/union activity. Require the
+  # isolated segment to contain at least one union-specific term.
+  UNION_RELEVANCE_ANCHORS <- c(
+    "union", "unionize", "unionized", "unionizing", "nlrb", "n.l.r.b.",
+    "collective bargaining", "picket", "strike", "afl-cio", "seiu", "teamsters",
+    "uaw", "united auto workers", "afscme", "shop steward", "union rep",
+    "union representative", "organizing committee", "starbucks workers united",
+    "amazon labor union", "labor organizer", "card check", "decertification"
+  )
+  is_union_relevant <- as.integer(
+    any(sapply(UNION_RELEVANCE_ANCHORS, function(t) str_detect(body_lower, fixed(t))))
+  )
+
   story_trigger <- classify_trigger(lede_lower)
   if (story_trigger == "other") {
     story_trigger <- classify_trigger(body_lower)
@@ -401,6 +442,7 @@ parse_story <- function(raw_block, file_network) {
       section        = section_raw %||% NA_character_,
       is_opinion     = is_opinion,
       is_us_story    = is_us_story,
+      is_union_relevant = is_union_relevant,
       factiva_region = factiva_region,
       story_date     = date_parsed,
       headline       = headline,
@@ -486,11 +528,20 @@ if (length(rtf_files) == 0) {
 message("Found ", length(rtf_files), " labor RTF file(s)")
 
 all_stories <- lapply(rtf_files, process_rtf_file)
-df <- bind_rows(Filter(Negate(is.null), all_stories))
+df_all <- bind_rows(Filter(Negate(is.null), all_stories))
 
-message("\nTotal stories parsed: ", nrow(df))
+message("\nTotal stories parsed: ", nrow(df_all))
 
-df <- df %>% arrange(story_date, network, show)
+n_foreign <- sum(df_all$is_us_story == 0, na.rm = TRUE)
+n_not_union_relevant <- sum(df_all$is_union_relevant == 0, na.rm = TRUE)
+message("Excluding ", n_foreign, " stories primarily about a foreign event")
+message("Excluding ", n_not_union_relevant, " stories with no union-specific reference")
+
+df <- df_all %>%
+  filter(is_us_story == 1, is_union_relevant == 1) %>%
+  arrange(story_date, network, show)
+
+message("Stories retained after US-only + union-relevance filters: ", nrow(df))
 
 write_csv(df, OUTPUT_CSV, na = "")
 message("Saved to: ", OUTPUT_CSV)

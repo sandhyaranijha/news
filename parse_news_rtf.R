@@ -548,12 +548,6 @@ parse_story <- function(raw_block, file_network) {
     "congress","senate","supreme court","white house","planned parenthood",
     "united states","american","u.s."
   ), collapse = "|")
-  is_us_story <- as.integer(
-    media_type == "tv" |
-    str_detect(factiva_region, "Domestic") |
-    str_detect(tolower(body_text), US_STATES)
-  )
-
   # --- Isolate the abortion segment within TV documents ---
   # Many TV "documents" are full broadcast rundowns (multiple unrelated stories
   # stitched into one Factiva record, sometimes 10,000+ words). Counting phrases
@@ -601,6 +595,31 @@ parse_story <- function(raw_block, file_network) {
 
   # --- Phrase counts (TV: isolated segment; print: full story text) ---
   body_lower <- tolower(body_text)
+
+  # --- Real US-only filter ---
+  # is_us_story previously defaulted to 1 for every TV story regardless of
+  # content (media_type == "tv" was OR'd in), so it never actually excluded
+  # anything. Stories primarily about a foreign event (e.g. a French labor
+  # strike segment, a Munich attack) slipped through. Now we scan the
+  # isolated story text itself: US state/federal signals keep a story (so
+  # state/local US stories are preserved), but a story whose only country
+  # signal is foreign is dropped.
+  FOREIGN_SIGNALS <- tolower(c(
+    "canada", "canadian", "france", "french", "germany", "german",
+    "australia", "australian", "united kingdom", "britain", "british", "england",
+    "china", "chinese", "japan", "japanese", "mexico", "mexican", "india", "indian",
+    "brazil", "brazilian", "italy", "italian", "spain", "spanish", "russia", "russian",
+    "ukraine", "ukrainian", "israel", "israeli", "palestine", "palestinian",
+    "south korea", "korean", "ireland", "irish", "scotland", "wales", "netherlands",
+    "belgium", "switzerland", "sweden", "norway", "denmark", "poland", "portugal",
+    "greece", "turkey", "egypt", "south africa", "nigeria", "argentina", "chile",
+    "colombia", "venezuela", "philippines", "indonesia", "vietnam", "thailand",
+    "new zealand", "munich", "berlin", "paris", "london", "tokyo", "beijing",
+    "toronto", "ottawa", "sydney", "melbourne"
+  ))
+  us_hits      <- sum(sapply(strsplit(US_STATES, "\\|")[[1]], function(t) str_count(body_lower, fixed(t))))
+  foreign_hits <- sum(sapply(FOREIGN_SIGNALS, function(t) str_count(body_lower, fixed(t))))
+  is_us_story <- as.integer(!(foreign_hits > 0 & foreign_hits >= us_hits))
 
   # --- Trigger classification ---
   # Primary: use the abortion segment lede (200 words) — captures what prompted
@@ -804,12 +823,19 @@ message("Found ", length(rtf_files), " RTF file(s)")
 
 # Parse all files
 all_stories <- lapply(rtf_files, process_rtf_file)
-df <- bind_rows(Filter(Negate(is.null), all_stories))
+df_all <- bind_rows(Filter(Negate(is.null), all_stories))
 
-message("\nTotal stories parsed: ", nrow(df))
+message("\nTotal stories parsed: ", nrow(df_all))
+
+n_foreign <- sum(df_all$is_us_story == 0, na.rm = TRUE)
+message("Excluding ", n_foreign, " stories primarily about a foreign event")
 
 # Sort by date
-df <- df %>% arrange(story_date, network, show)
+df <- df_all %>%
+  filter(is_us_story == 1) %>%
+  arrange(story_date, network, show)
+
+message("Stories retained after US-only filter: ", nrow(df))
 
 # Write CSV
 write_csv(df, OUTPUT_CSV, na = "")
