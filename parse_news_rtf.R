@@ -548,22 +548,6 @@ parse_story <- function(raw_block, file_network) {
     "congress","senate","supreme court","white house","planned parenthood",
     "united states","american","u.s."
   ), collapse = "|")
-  # --- Strip the leading show-rundown teaser block (TV only) ---
-  # Every Factiva document for a broadcast carries a "rundown" preamble listing
-  # ALL of that night's segment topics (e.g. "TRUMP, ABORTION ... GRAPHICS: MELANIA
-  # TRUMP DEFENDS ABORTION RIGHTS"), even on documents whose actual segment has
-  # nothing to do with abortion (e.g. a dockworker-strike story). Anchor-term
-  # matching against this preamble produces false-positive inclusions and corrupts
-  # downstream classification. The real segment content starts at the first
-  # speaker cue ("NAME (NETWORK NEWS)"), so drop everything before that.
-  if (media_type == "tv") {
-    rundown_match <- str_locate(body_text,
-      "[A-Z][A-Z.,'-]+(?: [A-Z][A-Z.,'-]+){0,4} \\((?:ABC|CBS|NBC|FOX|PBS|MSNBC) NEWS\\)")
-    if (!is.na(rundown_match[1, 1]) && rundown_match[1, 1] > 1) {
-      body_text <- substr(body_text, rundown_match[1, 1], nchar(body_text))
-    }
-  }
-
   # --- Isolate the abortion segment within TV documents ---
   # Many TV "documents" are full broadcast rundowns (multiple unrelated stories
   # stitched into one Factiva record, sometimes 10,000+ words). Counting phrases
