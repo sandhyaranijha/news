@@ -678,12 +678,12 @@ parse_story <- function(raw_block, file_network) {
         (media_type == "print" & str_count(body_text, "\\S+") > 3000)
       ),
 
-      # --- Source / quote indicators (print-oriented) ---
+      # --- Source / quote indicators ---
       # Strategy: look for attribution verbs ("said", "told", "according to") within
       # 200 chars of role-specific keywords. Each flag = 1 if pattern found anywhere
-      # in the body; 0 otherwise. For TV transcripts these will fire but are less
-      # reliable (anchors paraphrase rather than quote).
-      src_affected_woman = as.integer(media_type == "print" & str_detect(body_lower,
+      # in the body; 0 otherwise. Runs on both print and TV (isolated segment); TV
+      # hits are less reliable since anchors paraphrase rather than directly quote.
+      src_affected_woman = as.integer(str_detect(body_lower,
         paste0(
           "(?:said|told|according to|interview|speaking|recalls?|describ|explain|shared|recounted?|testified)",
           ".{0,200}",
@@ -694,7 +694,7 @@ parse_story <- function(raw_block, file_network) {
         )
       )),
 
-      src_provider = as.integer(media_type == "print" & str_detect(body_lower,
+      src_provider = as.integer(str_detect(body_lower,
         paste0(
           "(?:said|told|according to|interview|speaking)",
           ".{0,200}",
@@ -704,7 +704,7 @@ parse_story <- function(raw_block, file_network) {
         )
       )),
 
-      src_politician = as.integer(media_type == "print" & str_detect(body_lower,
+      src_politician = as.integer(str_detect(body_lower,
         paste0(
           "(?:said|told|according to|statement|tweeted|posted|announced|declared)",
           ".{0,200}",
@@ -714,7 +714,7 @@ parse_story <- function(raw_block, file_network) {
         )
       )),
 
-      src_religious = as.integer(media_type == "print" & str_detect(body_lower,
+      src_religious = as.integer(str_detect(body_lower,
         paste0(
           "(?:said|told|according to|statement|pastoral letter|homily|sermon)",
           ".{0,200}",
@@ -723,7 +723,7 @@ parse_story <- function(raw_block, file_network) {
         )
       )),
 
-      src_expert = as.integer(media_type == "print" & str_detect(body_lower,
+      src_expert = as.integer(str_detect(body_lower,
         paste0(
           "(?:said|told|according to|study|research|findings?|analysis)",
           ".{0,200}",
@@ -733,7 +733,7 @@ parse_story <- function(raw_block, file_network) {
         )
       )),
 
-      src_antiabortion_advocate = as.integer(media_type == "print" & str_detect(body_lower,
+      src_antiabortion_advocate = as.integer(str_detect(body_lower,
         paste0(
           "(?:said|told|according to|statement|argues?|contends?)",
           ".{0,200}",
@@ -743,7 +743,7 @@ parse_story <- function(raw_block, file_network) {
         )
       )),
 
-      src_prochoice_advocate = as.integer(media_type == "print" & str_detect(body_lower,
+      src_prochoice_advocate = as.integer(str_detect(body_lower,
         paste0(
           "(?:said|told|according to|statement|argues?|contends?)",
           ".{0,200}",
