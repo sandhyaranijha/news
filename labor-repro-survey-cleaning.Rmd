@@ -1,0 +1,301 @@
+---
+title: "Labor and Repro Justice Survey — Data Cleaning & Quality Flagging"
+output: html_document
+---
+
+## Overview
+
+This document cleans and prepares the Labor and Repro Justice Survey data exported from Qualtrics. It proceeds in seven steps:
+
+1. Load the required R libraries
+2. Load the raw CSV and remove Qualtrics metadata rows
+3. Split multi-select question columns into individual binary columns
+4. Assign a response quality flag (E / P / Q) to each row
+5. Add suspicion detail flags to help prioritize review of questionable responses
+6. Print a summary of the flagged dataset
+7. Save the cleaned, flagged dataset as a new CSV
+
+Each section can be run independently as a chunk. Run them in order top to bottom on first use.
+
+---
+
+## Step 1: Load Libraries
+
+The script uses `dplyr` for data manipulation and `stringr` for text matching. If either package is not yet installed, uncomment the install line below.
+
+```{r setup, message=FALSE, warning=FALSE}
+# install.packages(c("dplyr", "stringr"))
+library(dplyr)
+library(stringr)
+```
+
+---
+
+## Step 2: Load the Raw Data
+
+Qualtrics CSV exports always include three header rows before the actual survey responses begin:
+
+- **Row 1** — variable names (e.g., `Q1`, `Q23`). `read.csv()` uses this as column headers.
+- **Row 2** — full question text labels (e.g., "What best describes your role?"). Not needed for analysis; removed below.
+- **Row 3** — Qualtrics internal import IDs (e.g., `{"ImportId":"QID2"}`). Not needed; removed below.
+
+Actual survey responses begin on row 4 of the file.
+
+```{r load-data}
+
+file_path <- "C:/Users/sandh/Downloads/labor-repro-survey.csv"
+
+df <- read.csv(file_path, header = TRUE, stringsAsFactors = FALSE, check.names = TRUE)
+df <- df[-c(1, 2), ]   # remove question-label row and import-ID row
+rownames(df) <- NULL   # reset row index to 1..n
+
+# Rename the duration column (R converts spaces/parentheses to dots)
+names(df)[names(df) == "Duration..in.seconds."] <- "duration_sec"
+df$duration_sec <- as.numeric(df$duration_sec)
+
+n_original_cols <- ncol(df)   # used later to confirm dummy expansion
+```
+
+```{r verify-load}
+# Confirm expected dimensions before proceeding
+cat("Rows (responses):", nrow(df), "\n")
+cat("Columns:", ncol(df), "\n")
+cat("Column names:\n")
+print(names(df))
+```
+
+---
+
+## Step 3: Split Multi-Select Columns into Binary Dummy Columns
+
+Several survey questions allowed respondents to select more than one answer. Qualtrics stores all selected options in a single cell, separated by commas. For example, a response to the work-type question might appear as:
+
+> `Labor organizing,Reproductive justice,Other (please specify)`
+
+This format is not usable for analysis. The code below converts each multi-select column into a set of binary (0/1) columns — one column per response option — where 1 means the option was selected and 0 means it was not.
+
+**How options are separated.** Qualtrics puts a comma with *no space after it* between selected options. Some option labels contain their own commas (for example, several Q15 options), but those are followed by a space (`", "`). The code therefore splits only on commas that are not followed by a space, so labels with internal commas stay intact.
+
+**Which columns are split.** Rather than typing out every option by hand, the code finds the multi-select columns automatically: any question column (names starting with `Q` or `QID`) that contains at least one Qualtrics separator comma. Open-text columns (`*_TEXT`, Q20, Q21a, Q22) are never split. The list of columns and options it found is printed below so you can check it. If a column is wrongly included or missed, edit `multi_select_cols` by hand.
+
+The helper function `make_dummies()` does the conversion. It takes the source column, a list of all possible options, and a prefix for the new column names. A cell gets a 1 only when one of its split pieces matches the option exactly, so an option like "Other" doesn't match "Other (please specify)".
+
+**New column naming convention:** `<prefix>__<option_text>` with punctuation replaced by underscores.
+
+```{r dummy-function}
+option_sep <- ",(?!\\s)"   # a comma not followed by whitespace
+
+split_options <- function(x) {
+  lapply(str_split(x, option_sep), function(p) trimws(p[!is.na(p) & trimws(p) != ""]))
+}
+
+make_dummies <- function(df, source_col, options, prefix) {
+  pieces <- split_options(df[[source_col]])
+  for (opt in options) {
+    col_name <- paste0(prefix, "__",
+                       str_replace_all(trimws(opt), "[^A-Za-z0-9]+", "_"))
+    col_name <- str_replace_all(col_name, "_+", "_")
+    col_name <- str_remove(col_name, "_$")
+    df[[col_name]] <- as.integer(sapply(pieces, function(p) opt %in% p))
+  }
+  df
+}
+```
+
+```{r make-dummies}
+open_text_cols <- c("Q20", "Q21a", "Q22")
+
+candidate_cols <- names(df)[str_detect(names(df), "^(Q|QID)\\d") &
+                            !str_detect(names(df), "_TEXT$") &
+                            !names(df) %in% open_text_cols]
+
+multi_select_cols <- candidate_cols[sapply(candidate_cols, function(col) {
+  any(str_detect(df[[col]], option_sep), na.rm = TRUE)
+})]
+
+for (col in multi_select_cols) {
+  options <- sort(unique(unlist(split_options(df[[col]]))))
+  cat(sprintf("\n%s (%d options):\n", col, length(options)))
+  cat(paste0("  - ", options, collapse = "\n"), "\n")
+  df <- make_dummies(df, col, options, prefix = col)
+}
+```
+
+```{r verify-dummies}
+# Confirm total column count after all dummy expansion
+cat("Multi-select columns split:", paste(multi_select_cols, collapse = ", "), "\n")
+cat("Started with", n_original_cols, "original columns\n")
+cat("Total columns after dummy expansion:", ncol(df), "\n")
+```
+
+---
+
+## Step 4: Assign Response Quality Flags
+
+Each response receives one of three quality flags in a new column called `response_flag`. The flags are assigned in priority order: E is checked first, then P, and Q is the default for everything remaining.
+
+**E — Definitely Exclude**
+Applied when any one of the following is true:
+
+- `Status == "Survey Preview"`: Test submissions recorded during survey setup; not real respondents.
+- `Q1 is blank`: The respondent never answered the first substantive question, indicating they did not engage with the survey content.
+- `Fewer than 18 of 27 questions answered`: The survey contained 18 required questions. Any response with fewer than 18 questions answered bypassed required fields, indicating automated or invalid form submission rather than genuine participation.
+- `Contradictory volunteer/staff answers`: The respondent answered Q1 with "Member of an all-volunteer network" but checked "Staff" in any of Q7_1–Q7_4, QID11_1–QID11_6, or QID12_1–QID12_8. An all-volunteer network has no staff, so the answers cannot both be true.
+
+**P — Probable** (requires human review of text)
+Applied to all non-E rows where at least one open-text field contains a response. Filling in a free-response field is a strong indicator of human engagement. However, the text content should still be reviewed for AI-generated language.
+
+The open-text fields checked are: Q1_7_TEXT (other role), Q2_4_TEXT (other org type), Q5_4_TEXT (other work type), Q6_4_TEXT (other work focus), Q8_9_TEXT (other opposition source), Q9_8_TEXT (other opposition form), Q12_8_TEXT (other opportunity), Q13_8_TEXT (other tension), Q15_7_TEXT (other approach), Q16_7_TEXT (other strategy), Q17a_7_TEXT (other shift), Q19_7_TEXT (other framework change), Q20 (collaboration description), Q21a (cross-sector collaboration description), Q22 (open narrative response).
+
+**Q — Questionable**
+All non-E rows with no open-text responses. These respondents completed only multiple-choice items, which automated responses can replicate easily. See Step 5 for additional detail flags that help prioritize which Q-flagged responses to review first.
+
+```{r define-question-groups}
+# Each entry lists all columns belonging to one survey question.
+# A question counts as "answered" if any of its columns contains a response.
+question_groups <- list(
+  Q1     = "Q1",
+  Q2     = "Q2",
+  Q3     = "Q3",
+  Q23_states = "Q23",
+  Q5     = "Q5",
+  Q6     = "Q6",
+  Q7     = c("Q7_1","Q7_2","Q7_3","Q7_4"),
+  QID11  = c("QID11_1","QID11_2","QID11_3","QID11_4","QID11_5","QID11_6"),
+  QID12  = c("QID12_1","QID12_2","QID12_3","QID12_4","QID12_5","QID12_6",
+             "QID12_7","QID12_8","QID12_9"),
+  Q8     = "Q8",
+  Q9     = "Q9",
+  Q10    = c("Q10_1","Q10_2","Q10_3","Q10_4"),
+  Q12    = "Q12",
+  Q13    = "Q13",
+  Q14    = c("Q14_1","Q14_2","Q14_3","Q14_4"),
+  Q15    = "Q15",
+  Q15a   = c("Q15a_1","Q15a_2","Q15a_3","Q15a_4","Q15a_5","Q15a_6","Q15a_7"),
+  Q16    = "Q16",
+  Q16a   = c("Q16a_1","Q16a_2","Q16a_3","Q16a_4","Q16a_5","Q16a_6","Q16a_7"),
+  Q17    = "Q17",
+  Q17a   = "Q17a",
+  Q18    = "Q18",
+  Q19    = "Q19",
+  Q20    = "Q20",
+  Q21    = "Q21",
+  Q21a   = "Q21a",
+  Q22    = "Q22"
+)
+```
+
+```{r assign-flags}
+text_cols <- c(
+  "Q1_7_TEXT", "Q2_4_TEXT",  "Q5_4_TEXT",   "Q6_4_TEXT",
+  "Q8_9_TEXT", "Q9_8_TEXT",  "Q12_8_TEXT",  "Q13_8_TEXT",
+  "Q15_7_TEXT","Q16_7_TEXT", "Q17a_7_TEXT", "Q19_7_TEXT",
+  "Q20", "Q21a", "Q22"
+)
+
+questions_answered <- apply(df, 1, function(r) {
+  sum(sapply(question_groups, function(cols) any(nchar(trimws(r[cols])) > 0)))
+})
+
+has_text <- apply(df[, text_cols], 1, function(r) any(nchar(trimws(r)) > 0))
+
+# Contradiction: all-volunteer network in Q1, but "Staff" checked elsewhere
+staff_cols <- c(paste0("Q7_", 1:4), paste0("QID11_", 1:6), paste0("QID12_", 1:8))
+is_volunteer_network <- str_detect(df$Q1, fixed("Member of an all-volunteer network",
+                                                 ignore_case = TRUE))
+checked_staff <- apply(df[, staff_cols], 1, function(r) {
+  any(str_detect(r, regex("\\bstaff\\b", ignore_case = TRUE)), na.rm = TRUE)
+})
+volunteer_staff_conflict <- is_volunteer_network & checked_staff
+
+df$response_flag <- case_when(
+  df$Status == "Survey Preview" ~ "E",
+  trimws(df$Q1) == ""           ~ "E",
+  questions_answered < 18       ~ "E",
+  volunteer_staff_conflict      ~ "E",
+  has_text                      ~ "P",
+  TRUE                          ~ "Q"
+)
+```
+
+```{r verify-flags}
+cat("=== Response flag distribution ===\n")
+print(table(df$response_flag, useNA = "ifany"))
+cat(sprintf("\n  Volunteer network + staff contradictions: %d\n",
+            sum(volunteer_staff_conflict, na.rm = TRUE)))
+```
+
+---
+
+## Step 5: Suspicion Detail Flags
+
+These three columns provide additional detail to help prioritize manual review of Q-flagged responses. They are calculated for all rows but are most relevant for Q entries. They do **not** change the E / P / Q assignment — they are supplementary information only.
+
+**`flag_short_duration`** — Completion time under 5 minutes (300 seconds). Qualtrics estimates this survey takes about 9 minutes, so finishing in under 5 minutes, with 18 required questions and multiple open-ended items, suggests the respondent was not reading carefully.
+
+**`flag_straightline_Q10`** — All four Q10 Likert scale items (measuring perceptions of right-wing threats) answered identically. Uniform responses across four conceptually distinct statements suggest inattentive or automated completion. Note: the raw data contains inconsistent capitalization in Q10 responses (e.g., "strongly disagree" vs. "Strongly agree"); `tolower()` normalizes this before comparison.
+
+**`flag_straightline_Q14`** — Same straight-lining logic applied to Q14 (four Likert items measuring perceptions of internal organizational tensions).
+
+**`suspicion_count`** — A simple sum of the three flags above, ranging from 0 to 3. Higher values indicate more reason to scrutinize the response during manual review.
+
+```{r suspicion-flags}
+# Flag 1: Completed in under 5 minutes (300 seconds)
+df$flag_short_duration <- as.integer(df$duration_sec < 300)
+
+# Flag 2: Straight-lining on Q10 (right-wing threat Likert scale)
+q10_cols <- c("Q10_1","Q10_2","Q10_3","Q10_4")
+df$flag_straightline_Q10 <- apply(df[, q10_cols], 1, function(r) {
+  filled <- tolower(trimws(r[nchar(trimws(r)) > 0]))
+  as.integer(length(filled) == 4 && length(unique(filled)) == 1)
+})
+
+# Flag 3: Straight-lining on Q14 (internal tensions Likert scale)
+q14_cols <- c("Q14_1","Q14_2","Q14_3","Q14_4")
+df$flag_straightline_Q14 <- apply(df[, q14_cols], 1, function(r) {
+  filled <- tolower(trimws(r[nchar(trimws(r)) > 0]))
+  as.integer(length(filled) == 4 && length(unique(filled)) == 1)
+})
+
+# Combined suspicion count
+df$suspicion_count <- df$flag_short_duration +
+                      df$flag_straightline_Q10 +
+                      df$flag_straightline_Q14
+```
+
+```{r verify-suspicion}
+cat("=== Suspicion flags among Q-flagged responses ===\n")
+q_rows <- filter(df, response_flag == "Q")
+cat(sprintf("  Short duration (<5 min):    %d\n", sum(q_rows$flag_short_duration,   na.rm = TRUE)))
+cat(sprintf("  Straight-line Q10:          %d\n", sum(q_rows$flag_straightline_Q10, na.rm = TRUE)))
+cat(sprintf("  Straight-line Q14:          %d\n", sum(q_rows$flag_straightline_Q14, na.rm = TRUE)))
+cat(sprintf("  2 or more flags raised:     %d\n", sum(q_rows$suspicion_count >= 2,  na.rm = TRUE)))
+```
+
+---
+
+## Step 6: Final Summary
+
+```{r final-summary}
+cat("=== Final dataset dimensions ===\n")
+cat(sprintf("  Rows:    %d\n", nrow(df)))
+cat(sprintf("  Columns: %d\n", ncol(df)))
+
+cat("\n=== Response flag counts ===\n")
+flag_tbl <- table(df$response_flag, useNA = "ifany")
+print(flag_tbl)
+cat(sprintf("\n  Total accounted for: %d\n", sum(flag_tbl)))
+```
+
+---
+
+## Step 7: Save Output
+
+The cleaned and flagged dataset is saved as a new CSV in the same Downloads folder as the raw file. The original file is not modified.
+
+```{r save-output}
+output_path <- file.path(dirname(file_path), "labor_repro_survey_flagged.csv")
+write.csv(df, output_path, row.names = FALSE)
+cat(sprintf("Saved to: %s\n", output_path))
+cat(sprintf("Dimensions: %d rows x %d columns\n", nrow(df), ncol(df)))
+```
