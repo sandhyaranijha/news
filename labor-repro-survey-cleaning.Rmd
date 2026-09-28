@@ -141,14 +141,38 @@ Applied when any one of the following is true:
 - `Q1 is blank`: The respondent never answered the first substantive question, indicating they did not engage with the survey content.
 - `Fewer than 18 of 27 questions answered`: The survey contained 18 required questions. Any response with fewer than 18 questions answered bypassed required fields, indicating automated or invalid form submission rather than genuine participation.
 - `Contradictory volunteer/staff answers`: The respondent answered Q1 with "Member of an all-volunteer network" but checked "Staff" in any of Q7_1–Q7_4, QID11_1–QID11_6, or QID12_1–QID12_8. An all-volunteer network has no staff, so the answers cannot both be true.
+- `Completed in under 2 minutes`: Qualtrics estimates the survey takes about 9 minutes. Under 2 minutes (120 seconds) is too fast to have read the questions. Responses between 2 and 5 minutes are not excluded but are flagged for review in Step 5.
 
 **P — Probable** (requires human review of text)
-Applied to all non-E rows where at least one open-text field contains a response. Filling in a free-response field is a strong indicator of human engagement. However, the text content should still be reviewed for AI-generated language.
+Applied to all non-E rows where at least one open-text field contains a response, unless that text repeats another respondent's wording (see Q below). Filling in a free-response field is a strong indicator of human engagement. However, the text content should still be reviewed for AI-generated language.
 
 The open-text fields checked are: Q1_7_TEXT (other role), Q2_4_TEXT (other org type), Q5_4_TEXT (other work type), Q6_4_TEXT (other work focus), Q8_9_TEXT (other opposition source), Q9_8_TEXT (other opposition form), Q12_8_TEXT (other opportunity), Q13_8_TEXT (other tension), Q15_7_TEXT (other approach), Q16_7_TEXT (other strategy), Q17a_7_TEXT (other shift), Q19_7_TEXT (other framework change), Q20 (collaboration description), Q21a (cross-sector collaboration description), Q22 (open narrative response).
 
 **Q — Questionable**
-All non-E rows with no open-text responses. These respondents completed only multiple-choice items, which automated responses can replicate easily. See Step 5 for additional detail flags that help prioritize which Q-flagged responses to review first.
+All non-E rows that meet either of these conditions:
+
+- `No open-text responses`: The respondent completed only multiple-choice items, which automated responses can replicate easily.
+- `Repeated text`: At least one open-text answer shares a run of 4 or more identical consecutive words with another respondent's answer to the same question. Matching ignores capitalization and punctuation. Copy-pasted or bot-generated submissions often reuse the same phrases, while independent human answers rarely match word-for-word for that long. Answers shorter than 4 words are never flagged by this rule.
+
+See Step 5 for additional detail flags that help prioritize which Q-flagged responses to review first.
+
+**Reason columns**
+So you can see why each row got its flag, the output includes one 0/1 column per rule (1 = the rule applies) plus a readable summary column:
+
+| Column | Meaning |
+|---|---|
+| `E_survey_preview` | Status is "Survey Preview" |
+| `E_q1_blank` | Q1 is blank |
+| `E_under_18_answered` | Fewer than 18 of 27 questions answered |
+| `E_volunteer_staff_conflict` | All-volunteer network in Q1 but "Staff" checked |
+| `E_under_2_min` | Completed in under 2 minutes |
+| `Q_no_text` | No open-text responses |
+| `Q_repeated_text` | Open-text answer repeats another respondent's wording |
+| `repeated_text_cols` | Which open-text columns had the repeated wording |
+| `questions_answered` | Number of the 27 questions answered |
+| `flag_reason` | Every reason that applies, separated by semicolons |
+
+The reason columns list every rule a row breaks, even though the row gets only one flag. For example, a row can have both `E_q1_blank = 1` and `E_under_2_min = 1`.
 
 ```{r define-question-groups}
 # Each entry lists all columns belonging to one survey question.
@@ -208,21 +232,70 @@ checked_staff <- apply(df[, staff_cols], 1, function(r) {
 })
 volunteer_staff_conflict <- is_volunteer_network & checked_staff
 
+# Repeated text: 4+ identical consecutive words shared with another row's
+# answer in the same column
+word_runs <- function(x, n = 4) {
+  if (is.na(x)) return(character(0))
+  words <- str_split(str_squish(str_replace_all(tolower(x), "[^a-z0-9']+", " ")), " ")[[1]]
+  words <- words[words != ""]
+  if (length(words) < n) return(character(0))
+  unique(sapply(seq_len(length(words) - n + 1),
+                function(i) paste(words[i:(i + n - 1)], collapse = " ")))
+}
+
+repeated_by_col <- sapply(text_cols, function(col) {
+  runs   <- lapply(df[[col]], word_runs)
+  counts <- table(unlist(runs))          # each run counted once per row
+  shared <- names(counts)[counts > 1]
+  sapply(runs, function(r) any(r %in% shared))
+})
+repeated_by_col <- matrix(repeated_by_col, nrow = nrow(df),
+                          dimnames = list(NULL, text_cols))
+has_repeated_text <- rowSums(repeated_by_col) > 0
+
+# One 0/1 column per rule, so the output shows why each row was flagged
+df$questions_answered         <- questions_answered
+df$E_survey_preview           <- as.integer(coalesce(df$Status == "Survey Preview", FALSE))
+df$E_q1_blank                 <- as.integer(coalesce(trimws(df$Q1) == "", TRUE))
+df$E_under_18_answered        <- as.integer(coalesce(questions_answered < 18, FALSE))
+df$E_volunteer_staff_conflict <- as.integer(coalesce(volunteer_staff_conflict, FALSE))
+df$E_under_2_min              <- as.integer(coalesce(df$duration_sec < 120, FALSE))
+df$Q_no_text                  <- as.integer(!coalesce(has_text, FALSE))
+df$Q_repeated_text            <- as.integer(has_repeated_text)
+df$repeated_text_cols         <- apply(repeated_by_col, 1, function(r)
+                                   paste(text_cols[r], collapse = "; "))
+
+is_E <- with(df, E_survey_preview | E_q1_blank | E_under_18_answered |
+                 E_volunteer_staff_conflict | E_under_2_min) == 1
+
 df$response_flag <- case_when(
-  df$Status == "Survey Preview" ~ "E",
-  trimws(df$Q1) == ""           ~ "E",
-  questions_answered < 18       ~ "E",
-  volunteer_staff_conflict      ~ "E",
-  has_text                      ~ "P",
-  TRUE                          ~ "Q"
+  is_E                    ~ "E",
+  df$Q_repeated_text == 1 ~ "Q",
+  df$Q_no_text == 0       ~ "P",
+  TRUE                    ~ "Q"
 )
+
+reason_labels <- c(
+  E_survey_preview           = "Survey preview",
+  E_q1_blank                 = "Q1 blank",
+  E_under_18_answered        = "Fewer than 18 questions answered",
+  E_volunteer_staff_conflict = "All-volunteer network but checked staff",
+  E_under_2_min              = "Completed in under 2 minutes",
+  Q_no_text                  = "No open-text responses",
+  Q_repeated_text            = "Repeated text"
+)
+df$flag_reason <- apply(df[, names(reason_labels)], 1, function(r)
+  paste(reason_labels[as.integer(r) == 1], collapse = "; "))
 ```
 
 ```{r verify-flags}
 cat("=== Response flag distribution ===\n")
 print(table(df$response_flag, useNA = "ifany"))
-cat(sprintf("\n  Volunteer network + staff contradictions: %d\n",
-            sum(volunteer_staff_conflict, na.rm = TRUE)))
+
+cat("\n=== Rows meeting each rule (a row can meet more than one) ===\n")
+for (col in names(reason_labels)) {
+  cat(sprintf("  %-42s %d\n", reason_labels[[col]], sum(df[[col]])))
+}
 ```
 
 ---
@@ -231,7 +304,7 @@ cat(sprintf("\n  Volunteer network + staff contradictions: %d\n",
 
 These three columns provide additional detail to help prioritize manual review of Q-flagged responses. They are calculated for all rows but are most relevant for Q entries. They do **not** change the E / P / Q assignment — they are supplementary information only.
 
-**`flag_short_duration`** — Completion time under 5 minutes (300 seconds). Qualtrics estimates this survey takes about 9 minutes, so finishing in under 5 minutes, with 18 required questions and multiple open-ended items, suggests the respondent was not reading carefully.
+**`flag_short_duration`** — Completion time under 5 minutes (300 seconds). Qualtrics estimates this survey takes about 9 minutes, so finishing in under 5 minutes, with 18 required questions and multiple open-ended items, suggests the respondent was not reading carefully. (Responses under 2 minutes are already marked E in Step 4; this flag is also set for them, but it matters most for the 2–5 minute range, which stays P or Q.)
 
 **`flag_straightline_Q10`** — All four Q10 Likert scale items (measuring perceptions of right-wing threats) answered identically. Uniform responses across four conceptually distinct statements suggest inattentive or automated completion. Note: the raw data contains inconsistent capitalization in Q10 responses (e.g., "strongly disagree" vs. "Strongly agree"); `tolower()` normalizes this before comparison.
 
